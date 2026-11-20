@@ -33,6 +33,10 @@ Built with React, Vite, TypeScript, and Supabase (auth + Postgres with row-level
 
 ## Deploying to GitHub Pages
 
-`vite.config.ts` sets `base: '/trade-journal/'`. Run `npm run build` and publish the `dist/` folder.
+`vite.config.ts` sets `base: '/trade-journal/'`. The workflow in `.github/workflows/deploy.yml` builds and deploys on every push to `main`.
+
+One-time setup on GitHub:
+1. **Settings → Secrets and variables → Actions**: add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+2. **Settings → Pages → Source**: choose **GitHub Actions**.
 The anon key is designed to be public; your data is protected by the RLS policy.
 Also add your Pages URL under **Supabase → Authentication → URL Configuration** so email confirmation links work.
