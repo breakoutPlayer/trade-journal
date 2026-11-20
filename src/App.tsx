@@ -8,9 +8,10 @@ import { TradeLog } from './pages/TradeLog'
 import { Import } from './pages/Import'
 import { Dashboard } from './pages/Dashboard'
 import { Calendar } from './pages/Calendar'
+import { Analytics } from './pages/Analytics'
 import { Logo } from './components/Logo'
 
-const TABS = ['Dashboard', 'Trades', 'Calendar', 'Import'] as const
+const TABS = ['Dashboard', 'Trades', 'Calendar', 'Analytics', 'Import'] as const
 type Tab = (typeof TABS)[number]
 
 export default function App() {
@@ -87,9 +88,10 @@ export default function App() {
       <main>
         {loadError && <div className="panel error">Could not load trades: {loadError}</div>}
         {tab === 'Dashboard' && <Dashboard trades={trades} />}
-        {tab === 'Trades' &&<TradeLog trades={trades} reload={reload} />}
+        {tab === 'Trades' && <TradeLog trades={trades} reload={reload} />}
         {tab === 'Calendar' && <Calendar trades={trades} />}
-        {tab === 'Import' &&<Import trades={trades} reload={reload} />}
+        {tab === 'Analytics' && <Analytics trades={trades} />}
+        {tab === 'Import' && <Import trades={trades} reload={reload} />}
       </main>
     </>
   )
