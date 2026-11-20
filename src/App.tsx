@@ -56,8 +56,9 @@ export default function App() {
       <div className="center-card">
         <Logo />
         <p>
-          Missing Supabase keys. Copy <code>.env.example</code> to <code>.env.local</code>, fill in your values, then
-          restart <code>npm run dev</code>.
+          Supabase keys are missing or invalid. Locally, copy <code>.env.example</code> to <code>.env.local</code>,
+          fill in your values, then restart <code>npm run dev</code>. On GitHub Pages, check the repository secrets
+          contain only the value (e.g. <code>https://xxxx.supabase.co</code>), not <code>NAME=value</code>.
         </p>
       </div>
     )
