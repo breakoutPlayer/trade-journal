@@ -12,6 +12,8 @@ export function Calendar({ trades }: { trades: Trade[] }) {
     return new Date(d.getFullYear(), d.getMonth(), 1)
   })
 
+  const [today] = useState(() => dayKey(new Date()))
+
   // Net P&L and trade count for every day.
   const byDay = useMemo(() => {
     const m = new Map<string, { net: number; count: number }>()
@@ -40,7 +42,6 @@ export function Calendar({ trades }: { trades: Trade[] }) {
   const maxAbs = Math.max(1, ...active.map((d) => Math.abs(d.net)))
 
   const shift = (n: number) => setMonth(new Date(year, mon + n, 1))
-  const today = dayKey(new Date())
 
   return (
     <>
