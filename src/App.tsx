@@ -1,16 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { configMissing, supabase } from './lib/supabase'
+import { fetchTrades } from './lib/trades'
+import type { Trade } from './lib/types'
 import { Login } from './pages/Login'
+import { TradeLog } from './pages/TradeLog'
 import { Logo } from './components/Logo'
 
-const TABS = ['Dashboard'] as const
+const TABS = ['Trades'] as const
 type Tab = (typeof TABS)[number]
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<Tab>('Dashboard')
+  const [tab, setTab] = useState<Tab>(TABS[0])
+  const [trades, setTrades] = useState<Trade[]>([])
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     if (configMissing) return
@@ -19,9 +24,27 @@ export default function App() {
       setLoading(false)
     })
     // Keeps the UI in sync when the user signs in/out or the token refreshes.
-    const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    const { data } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s)
+      if (!s) setTrades([]) // signed out: forget the previous user's data
+    })
     return () => data.subscription.unsubscribe()
   }, [])
+
+  const reload = useCallback(() => {
+    fetchTrades()
+      .then((t) => {
+        setTrades(t)
+        setLoadError('')
+      })
+      .catch((e: Error) => setLoadError(e.message))
+  }, [])
+
+  // Load trades whenever a user signs in.
+  const userId = session?.user.id
+  useEffect(() => {
+    if (userId) reload()
+  }, [userId, reload])
 
   if (configMissing) {
     return (
@@ -34,7 +57,14 @@ export default function App() {
       </div>
     )
   }
-  if (loading) return <div className="center-card"><Logo /><p>Loading…</p></div>
+  if (loading) {
+    return (
+      <div className="center-card">
+        <Logo />
+        <p>Loading…</p>
+      </div>
+    )
+  }
   if (!session) return <Login />
 
   return (
@@ -52,7 +82,8 @@ export default function App() {
         <button onClick={() => supabase.auth.signOut()}>Sign out</button>
       </header>
       <main>
-        <div className="panel"><p>Signed in. Features coming next.</p></div>
+        {loadError && <div className="panel error">Could not load trades: {loadError}</div>}
+        {tab === 'Trades' && <TradeLog trades={trades} reload={reload} />}
       </main>
     </>
   )
