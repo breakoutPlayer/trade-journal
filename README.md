@@ -6,7 +6,7 @@ Built with React, Vite, TypeScript, and Supabase (auth + Postgres with row-level
 
 ## Setup
 
-1. Create the `trades` table in Supabase (see `supabase/migrations/0001_create_trades.sql`).
+1. Create the `trades` table in Supabase (SQL Editor) with RLS enabled and an "own trades only" policy on `auth.uid() = user_id`.
 2. Copy `.env.example` to `.env.local` and fill in values from **Supabase → Project Settings → API**:
    ```
    VITE_SUPABASE_URL=https://xxxx.supabase.co
