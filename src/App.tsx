@@ -5,9 +5,10 @@ import { fetchTrades } from './lib/trades'
 import type { Trade } from './lib/types'
 import { Login } from './pages/Login'
 import { TradeLog } from './pages/TradeLog'
+import { Import } from './pages/Import'
 import { Logo } from './components/Logo'
 
-const TABS = ['Trades'] as const
+const TABS = ['Trades', 'Import'] as const
 type Tab = (typeof TABS)[number]
 
 export default function App() {
@@ -84,6 +85,7 @@ export default function App() {
       <main>
         {loadError && <div className="panel error">Could not load trades: {loadError}</div>}
         {tab === 'Trades' && <TradeLog trades={trades} reload={reload} />}
+        {tab === 'Import' && <Import trades={trades} reload={reload} />}
       </main>
     </>
   )
