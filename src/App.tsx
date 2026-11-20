@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { configMissing, supabase } from './lib/supabase'
 import { fetchTrades } from './lib/trades'
+import { downloadBackup } from './lib/backup'
 import type { Trade } from './lib/types'
 import { Login } from './pages/Login'
 import { TradeLog } from './pages/TradeLog'
@@ -83,6 +84,9 @@ export default function App() {
           ))}
         </nav>
         <span className="who">{session.user.email}</span>
+        <button onClick={() => downloadBackup(trades)} disabled={!trades.length} title="Download all trades as JSON">
+          Backup
+        </button>
         <button onClick={() => supabase.auth.signOut()}>Sign out</button>
       </header>
       <main>
