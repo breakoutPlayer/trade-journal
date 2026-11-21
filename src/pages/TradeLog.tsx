@@ -47,12 +47,13 @@ export function TradeLog({ trades, reload }: Props) {
       <div className="panel">
         <div className="row" style={{ marginBottom: 12 }}>
           <input
+            className="grow"
             style={{ maxWidth: 280 }}
             placeholder="Search symbol, notes, exchange…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <select style={{ maxWidth: 200 }} value={tag} onChange={(e) => setTag(e.target.value)}>
+          <select className="grow" style={{ maxWidth: 200 }} value={tag} onChange={(e) => setTag(e.target.value)}>
             <option value="">All tags</option>
             {allTags.map((t) => (
               <option key={t} value={t}>{t}</option>
@@ -67,7 +68,7 @@ export function TradeLog({ trades, reload }: Props) {
           <p>No trades here yet. Add one manually or import a CSV.</p>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="cards">
               <thead>
                 <tr>
                   <th>Closed</th>
@@ -88,25 +89,25 @@ export function TradeLog({ trades, reload }: Props) {
                   const net = netPnl(t)
                   return (
                     <tr key={t.id}>
-                      <td>{fmtDateTime(t.closed_at ?? t.opened_at)}</td>
-                      <td>
+                      <td className="c-date">{fmtDateTime(t.closed_at ?? t.opened_at)}</td>
+                      <td className="c-symbol">
                         <strong>{t.symbol}</strong>
                         {t.exchange && <div className="muted">{t.exchange}</div>}
                       </td>
-                      <td>
+                      <td className="c-side">
                         <span className={`side ${t.side === 'short' ? 'loss' : 'win'}`}>{t.side ?? '—'}</span>
                       </td>
-                      <td className="num">{fmtNum(t.size)}</td>
-                      <td className="num">{fmtNum(t.entry_price)}</td>
-                      <td className="num">{fmtNum(t.exit_price)}</td>
-                      <td className={`num ${pnlClass(net)}`}>{fmtMoney(net)}</td>
-                      <td>
+                      <td className="num" data-label="Size">{fmtNum(t.size)}</td>
+                      <td className="num" data-label="Entry">{fmtNum(t.entry_price)}</td>
+                      <td className="num" data-label="Exit">{fmtNum(t.exit_price)}</td>
+                      <td className={`num c-pnl ${pnlClass(net)}`}>{fmtMoney(net)}</td>
+                      <td className={`c-tags ${(t.tags ?? []).length ? '' : 'c-empty'}`}>
                         {(t.tags ?? []).map((g) => (
                           <span key={g} className="tag">{g}</span>
                         ))}
                       </td>
-                      <td className="notes">{t.notes}</td>
-                      <td>
+                      <td className={`notes ${t.notes ? '' : 'c-empty'}`}>{t.notes}</td>
+                      <td className="c-charts">
                         {(t.charts ?? []).length > 0 ? (
                           <button className="link" onClick={() => setViewing(t)}>
                             View ({t.charts!.length})
@@ -115,7 +116,7 @@ export function TradeLog({ trades, reload }: Props) {
                           <span className="muted">—</span>
                         )}
                       </td>
-                      <td>
+                      <td className="c-actions">
                         <div className="row" style={{ flexWrap: 'nowrap' }}>
                           <button onClick={() => setEditing(t)}>Edit</button>
                           <button className="danger" onClick={() => remove(t)}>Delete</button>

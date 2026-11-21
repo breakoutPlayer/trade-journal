@@ -84,11 +84,13 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <span className="who">{session.user.email}</span>
-        <button onClick={() => downloadBackup(trades)} disabled={!trades.length} title="Download all trades as JSON">
-          Backup
-        </button>
-        <button onClick={() => supabase.auth.signOut()}>Sign out</button>
+        <div className="account">
+          <span className="who">{session.user.email}</span>
+          <button onClick={() => downloadBackup(trades)} disabled={!trades.length} title="Download all trades as JSON">
+            Backup
+          </button>
+          <button onClick={() => supabase.auth.signOut()}>Sign out</button>
+        </div>
       </header>
       <main>
         {loadError && <div className="panel error">Could not load trades: {loadError}</div>}

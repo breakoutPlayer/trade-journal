@@ -6,6 +6,15 @@ export function fmtMoney(n: number, signed = true) {
   return (n > 0 ? '+' : n < 0 ? '-' : '') + s
 }
 
+const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
+
+/** Short signed amount for tight spaces, e.g. +1.2K */
+export function fmtMoneyShort(n: number) {
+  const a = Math.abs(n)
+  const s = a < 100 ? String(Math.round(a * 10) / 10) : a < 1000 ? String(Math.round(a)) : compact.format(a)
+  return (n > 0 ? '+' : n < 0 ? '-' : '') + s
+}
+
 export function fmtNum(n: number | null | undefined) {
   if (n === null || n === undefined) return '—'
   return Number(n).toLocaleString(undefined, { maximumFractionDigits: 8 })

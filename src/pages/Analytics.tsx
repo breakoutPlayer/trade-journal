@@ -24,7 +24,7 @@ function GroupTable({ title, label, rows }: { title: string; label: string; rows
                 <th className="num">Trades</th>
                 <th className="num">Win rate</th>
                 <th className="num">Profit factor</th>
-                <th className="num">Avg / trade</th>
+                <th className="num hide-sm">Avg / trade</th>
                 <th className="num">Net P&amp;L</th>
                 <th className="bar-cell"></th>
               </tr>
@@ -36,7 +36,7 @@ function GroupTable({ title, label, rows }: { title: string; label: string; rows
                   <td className="num">{r.count}</td>
                   <td className="num">{r.count ? fmtPct(r.winRate) : '—'}</td>
                   <td className="num">{!r.count ? '—' : r.profitFactor === Infinity ? '∞' : r.profitFactor.toFixed(2)}</td>
-                  <td className={`num ${pnlClass(r.net)}`}>{r.count ? fmtMoney(r.net / r.count) : '—'}</td>
+                  <td className={`num hide-sm ${pnlClass(r.net)}`}>{r.count ? fmtMoney(r.net / r.count) : '—'}</td>
                   <td className={`num ${pnlClass(r.net)}`}>{fmtMoney(r.net)}</td>
                   <td className="bar-cell">
                     <div

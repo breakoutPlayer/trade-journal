@@ -64,7 +64,7 @@ export function Import({ trades, reload }: Props) {
     <>
       <h1>Import CSV</h1>
       <div className="panel">
-        <div className="grid-form">
+        <div className="grid-form stack-sm">
           <label>
             Exchange
             <select value={choice} onChange={(e) => setChoice(e.target.value as Exchange | 'auto')}>

@@ -1,14 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CurvePoint } from '../lib/stats'
 import { fmtMoney } from '../lib/format'
 
-const W = 800
 const H = 260
 const PAD = { l: 64, r: 16, t: 16, b: 28 }
 
 /** A hand-drawn SVG line chart of cumulative P&L. Hover to see each trade. */
 export function EquityChart({ points }: { points: CurvePoint[] }) {
   const [hover, setHover] = useState<number | null>(null)
+  // Draw at the real pixel width so labels aren't stretched or squashed on narrow screens.
+  const [box, setBox] = useState<HTMLDivElement | null>(null)
+  const [W, setW] = useState(800)
+  useEffect(() => {
+    if (!box) return
+    const ro = new ResizeObserver(([e]) => setW(Math.max(280, Math.round(e.contentRect.width))))
+    ro.observe(box)
+    return () => ro.disconnect()
+  }, [box])
+
   if (points.length < 2) return <p>Add at least two trades to see your equity curve.</p>
 
   // Start the line at zero so the first trade's result is visible.
@@ -25,7 +34,7 @@ export function EquityChart({ points }: { points: CurvePoint[] }) {
   const color = final >= 0 ? 'var(--win)' : 'var(--loss)'
   const ticks = [max, (max + min) / 2, min]
 
-  function onMove(e: React.MouseEvent<SVGSVGElement>) {
+  function onMove(e: React.PointerEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
     const px = ((e.clientX - rect.left) / rect.width) * W
     const i = Math.round(((px - PAD.l) / (W - PAD.l - PAD.r)) * (values.length - 1))
@@ -34,8 +43,14 @@ export function EquityChart({ points }: { points: CurvePoint[] }) {
 
   const hp = hover !== null ? points[hover - 1] : null
   return (
-    <div className="chart" style={{ position: 'relative' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+    <div className="chart" ref={setBox} style={{ position: 'relative' }}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        onPointerMove={onMove}
+        onPointerDown={onMove}
+        onPointerLeave={() => setHover(null)}
+      >
         <defs>
           <linearGradient id="eq-fill" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0" stopColor={color} stopOpacity="0.25" />
@@ -69,7 +84,7 @@ export function EquityChart({ points }: { points: CurvePoint[] }) {
           className="panel"
           style={{
             position: 'absolute', top: 8, pointerEvents: 'none', padding: '8px 12px', fontSize: 13,
-            ...(hover! / values.length > 0.6 ? { left: 70 } : { right: 8 }),
+            ...(hover! / values.length > 0.5 ? { left: Math.min(70, W * 0.1) } : { right: 8 }),
           }}
         >
           <div className="muted">{hp.time.toLocaleString()}</div>

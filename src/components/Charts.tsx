@@ -135,7 +135,8 @@ export function ChartPicker({ saved, pending, onRemoveSaved, onAdd, onRemovePend
         onDragLeave={() => setOver(false)}
         onDrop={onDrop}
       >
-        Click to upload, drop images here, or paste a screenshot (Ctrl+V)
+        <span className="on-pointer">Click to upload, drop images here, or paste a screenshot (Ctrl+V)</span>
+        <span className="on-touch">Tap to add chart images</span>
       </div>
       <input
         ref={input}

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Trade } from '../lib/types'
 import { dayKey, netPnl, tradeTime } from '../lib/trades'
-import { fmtMoney, pnlClass } from '../lib/format'
+import { fmtMoney, fmtMoneyShort, pnlClass } from '../lib/format'
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -49,12 +49,12 @@ export function Calendar({ trades }: { trades: Trade[] }) {
       <div className="panel">
         <div className="row" style={{ marginBottom: 14 }}>
           <button onClick={() => shift(-1)} aria-label="Previous month">‹</button>
-          <h2 style={{ margin: 0, minWidth: 170, textAlign: 'center' }}>
+          <h2 className="cal-title">
             {month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
           </h2>
           <button onClick={() => shift(1)} aria-label="Next month">›</button>
           <span className="spacer" />
-          <span className="muted">
+          <span className="muted cal-summary">
             {active.length} trading day(s) · {greenDays} green · month{' '}
             <strong className={pnlClass(monthNet)}>{fmtMoney(monthNet)}</strong>
           </span>
@@ -81,7 +81,10 @@ export function Calendar({ trades }: { trades: Trade[] }) {
                 <span className="d">{d.date.getDate()}</span>
                 {d.count > 0 && (
                   <>
-                    <span className={`p ${pnlClass(d.net)}`}>{fmtMoney(d.net)}</span>
+                    <span className={`p ${pnlClass(d.net)}`}>
+                      <span className="full">{fmtMoney(d.net)}</span>
+                      <span className="short">{fmtMoneyShort(d.net)}</span>
+                    </span>
                     <span className="n">{d.count} trade{d.count > 1 ? 's' : ''}</span>
                   </>
                 )}
