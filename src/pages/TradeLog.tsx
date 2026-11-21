@@ -3,6 +3,8 @@ import type { Trade } from '../lib/types'
 import { deleteTrade, netPnl } from '../lib/trades'
 import { fmtDateTime, fmtMoney, fmtNum, pnlClass } from '../lib/format'
 import { TradeForm } from '../components/TradeForm'
+import { ChartViewer } from '../components/Charts'
+import { removeCharts } from '../lib/charts'
 
 interface Props {
   trades: Trade[]
@@ -11,6 +13,7 @@ interface Props {
 
 export function TradeLog({ trades, reload }: Props) {
   const [editing, setEditing] = useState<Trade | 'new' | null>(null)
+  const [viewing, setViewing] = useState<Trade | null>(null)
   const [search, setSearch] = useState('')
   const [tag, setTag] = useState('')
 
@@ -26,6 +29,7 @@ export function TradeLog({ trades, reload }: Props) {
     if (!confirm(`Delete this ${t.symbol} trade? This cannot be undone.`)) return
     try {
       await deleteTrade(t.id)
+      removeCharts(t.charts ?? []).catch(() => {})
       reload()
     } catch (err) {
       alert((err as Error).message)
@@ -75,6 +79,7 @@ export function TradeLog({ trades, reload }: Props) {
                   <th className="num">Net P&amp;L</th>
                   <th>Tags</th>
                   <th>Notes</th>
+                  <th>Charts</th>
                   <th></th>
                 </tr>
               </thead>
@@ -102,6 +107,15 @@ export function TradeLog({ trades, reload }: Props) {
                       </td>
                       <td className="notes">{t.notes}</td>
                       <td>
+                        {(t.charts ?? []).length > 0 ? (
+                          <button className="link" onClick={() => setViewing(t)}>
+                            View ({t.charts!.length})
+                          </button>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                      <td>
                         <div className="row" style={{ flexWrap: 'nowrap' }}>
                           <button onClick={() => setEditing(t)}>Edit</button>
                           <button className="danger" onClick={() => remove(t)}>Delete</button>
@@ -115,6 +129,14 @@ export function TradeLog({ trades, reload }: Props) {
           </div>
         )}
       </div>
+
+      {viewing && (
+        <ChartViewer
+          title={`${viewing.symbol} · ${fmtDateTime(viewing.closed_at ?? viewing.opened_at)}`}
+          paths={viewing.charts ?? []}
+          onClose={() => setViewing(null)}
+        />
+      )}
 
       {editing && (
         <TradeForm

@@ -20,6 +20,27 @@ Built with React, Vite, TypeScript, and Supabase (auth + Postgres with row-level
    ```
    Open http://localhost:5173/trade-journal/
 
+## Chart screenshots
+
+Trades can have chart images attached (upload, drag-and-drop, or paste a screenshot with Ctrl+V in the trade form). Files go to a private Supabase Storage bucket at `charts/<user_id>/…`; the trade's `charts` column holds their paths. Run this once in the SQL Editor:
+
+```sql
+alter table trades add column if not exists charts text[] not null default '{}';
+
+insert into storage.buckets (id, name, public)
+values ('charts', 'charts', false)
+on conflict (id) do nothing;
+
+create policy "own charts: read" on storage.objects for select to authenticated
+  using (bucket_id = 'charts' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "own charts: upload" on storage.objects for insert to authenticated
+  with check (bucket_id = 'charts' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "own charts: delete" on storage.objects for delete to authenticated
+  using (bucket_id = 'charts' and (storage.foldername(name))[1] = auth.uid()::text);
+```
+
+Images are limited to 10 MB each. The JSON backup includes chart paths but not the image files themselves.
+
 ## How P&L is stored
 
 - `pnl` = gross realized P&L, `fees` = fees paid. Every stat uses **net = pnl − fees**.

@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { Trade, TradeInput } from '../lib/types'
 import { insertTrades, updateTrade } from '../lib/trades'
+import { removeCharts, uploadChart } from '../lib/charts'
+import { ChartPicker, type PendingChart } from './Charts'
 import { fromLocalInput, parseTags, toLocalInput } from '../lib/format'
 
 interface Props {
@@ -27,7 +29,16 @@ export function TradeForm({ trade, onDone, onCancel }: Props) {
     notes: trade?.notes ?? '',
     tags: (trade?.tags ?? []).join(', '),
   })
+  const [savedCharts, setSavedCharts] = useState<string[]>(trade?.charts ?? [])
+  const [pending, setPending] = useState<PendingChart[]>([])
   const [busy, setBusy] = useState(false)
+
+  // Free the in-memory previews when the form closes.
+  const pendingRef = useRef(pending)
+  useEffect(() => {
+    pendingRef.current = pending
+  }, [pending])
+  useEffect(() => () => pendingRef.current.forEach((p) => URL.revokeObjectURL(p.preview)), [])
   const [error, setError] = useState('')
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
 
@@ -56,14 +67,23 @@ export function TradeForm({ trade, onDone, onCancel }: Props) {
       notes: f.notes.trim() || null,
       tags: parseTags(f.tags),
     }
+    const uploaded: string[] = []
     try {
+      for (const p of pending) uploaded.push(await uploadChart(p.file))
+      row.charts = [...savedCharts, ...uploaded]
       if (trade) await updateTrade(trade.id, row)
       else await insertTrades([row])
-      onDone()
     } catch (err) {
+      // Don't leave orphaned files behind if the trade itself didn't save.
+      removeCharts(uploaded).catch(() => {})
       setError((err as Error).message)
       setBusy(false)
+      return
     }
+    // The trade no longer points at charts the user removed, so delete the files.
+    const dropped = (trade?.charts ?? []).filter((c) => !savedCharts.includes(c))
+    removeCharts(dropped).catch(() => {})
+    onDone()
   }
 
   return (
@@ -101,11 +121,21 @@ export function TradeForm({ trade, onDone, onCancel }: Props) {
             <input value={f.tags} onChange={set('tags')} placeholder="breakout, a+ setup" />
           </label>
           <label className="wide">Notes<textarea rows={4} value={f.notes} onChange={set('notes')} /></label>
+          <ChartPicker
+            saved={savedCharts}
+            pending={pending}
+            onRemoveSaved={(path) => setSavedCharts(savedCharts.filter((c) => c !== path))}
+            onAdd={(files) => setPending((prev) => [...prev, ...files])}
+            onRemovePending={(p) => {
+              URL.revokeObjectURL(p.preview)
+              setPending((prev) => prev.filter((x) => x !== p))
+            }}
+          />
           {error && <div className="error wide">{error}</div>}
           <div className="row wide">
             <span className="spacer" />
             <button type="button" onClick={onCancel}>Cancel</button>
-            <button className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+            <button className="primary" disabled={busy}>{busy ? (pending.length ? 'Uploading…' : 'Saving…') : 'Save'}</button>
           </div>
         </form>
       </div>
