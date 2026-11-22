@@ -28,8 +28,12 @@ export function Journal({ trades, reload, openTrade }: Props) {
   const [sel, setSel] = useState<Record<Tab, string | null>>({ daily: null, trade: null, general: null })
   const select = (id: string | null) => setSel((s) => ({ ...s, [tab]: id }))
 
+  // Editors read their starting text once, so none is shown until notes have loaded.
+  const [loaded, setLoaded] = useState(false)
   const load = useCallback(() => {
-    fetchJournalNotes().then(setNotes, (e) => setError(journalError(e)))
+    fetchJournalNotes()
+      .then(setNotes, (e) => setError(journalError(e)))
+      .finally(() => setLoaded(true))
   }, [])
   useEffect(load, [load])
 
@@ -108,7 +112,9 @@ export function Journal({ trades, reload, openTrade }: Props) {
         </div>
 
         <section className="jr-main">
-          {tab === 'daily' && current ? (
+          {!loaded ? (
+            <div className="jr-placeholder"><span>Loading notes…</span></div>
+          ) : tab === 'daily' && current ? (
             <DailyPane
               key={current}
               day={current}
