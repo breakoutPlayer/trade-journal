@@ -26,7 +26,10 @@ async function legacyKeys(db: SupabaseClient, userId: string, exchange: string) 
   }
 }
 
-async function syncOne(db: SupabaseClient, conn: any): Promise<{ status: string; new_count: number; error?: string }> {
+/** Allowed manual look-back ranges, in days. */
+const RANGES = new Set([30, 60, 90])
+
+async function syncOne(db: SupabaseClient, conn: any, days?: number): Promise<{ status: string; new_count: number; error?: string }> {
   const adapter = ADAPTERS[conn.exchange]
   const { data: run } = await db.from('sync_runs').insert({ connection_id: conn.id, user_id: conn.user_id, status: 'running' }).select('id').single()
   await db.from('exchange_connections').update({ last_status: 'running' }).eq('id', conn.id)
@@ -39,7 +42,9 @@ async function syncOne(db: SupabaseClient, conn: any): Promise<{ status: string;
     if (error || !sec) throw new Error('Stored key not found; delete and re-add this connection')
     creds = await decryptJson<Creds>(sec.ciphertext, sec.iv, conn.id)
 
-    const since = conn.last_synced_at ? new Date(conn.last_synced_at).getTime() - OVERLAP : Date.now() - BACKFILL
+    // A chosen range re-scans that many days (duplicates are skipped); otherwise continue from the last sync.
+    const since = days ? Date.now() - days * DAY
+      : conn.last_synced_at ? new Date(conn.last_synced_at).getTime() - OVERLAP : Date.now() - BACKFILL
     const fetched: SyncedTrade[] = await adapter.fetchClosedTrades(creds, since)
 
     const legacy = fetched.length ? await legacyKeys(db, conn.user_id, fetched[0].exchange) : new Set<string>()
@@ -84,6 +89,7 @@ Deno.serve(async (req) => {
   const isCron = sent !== null && cronSecret.length >= 32 && (await safeEqual(sent, cronSecret))
   if (sent !== null && !isCron) return json({ error: 'Forbidden' }, 403)
   let query = db.from('exchange_connections').select('*').eq('enabled', true)
+  let days: number | undefined
 
   if (!isCron) {
     // User path: user_id comes only from the verified JWT.
@@ -94,12 +100,16 @@ Deno.serve(async (req) => {
     query = query.eq('user_id', userId)
     const body = await req.json().catch(() => ({}))
     if (typeof body?.connectionId === 'string') query = query.eq('id', body.connectionId)
+    if (body?.days !== undefined) {
+      if (!RANGES.has(body.days)) return json({ error: 'days must be 30, 60 or 90' }, 400)
+      days = body.days
+    }
   }
 
   const { data: conns, error } = await query
   if (error) return json({ error: error.message }, 500)
 
   const results: Record<string, unknown> = {}
-  for (const c of conns ?? []) results[c.id] = await syncOne(db, c)
+  for (const c of conns ?? []) results[c.id] = await syncOne(db, c, days)
   return json({ ok: true, results })
 })

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   EXCHANGES, addConnection, deleteConnection, fetchConnections, fetchRuns, setEnabled, syncNow,
-  type Connection, type ExchangeId, type SyncRun,
+  type Connection, type ExchangeId, type SyncRange, type SyncRun,
 } from '../lib/connections'
 import { fmtDateTime } from '../lib/format'
 
@@ -18,6 +18,7 @@ export function Connections({ reload }: Props) {
   const [exchange, setExchange] = useState<ExchangeId>('bitunix')
   const [form, setForm] = useState(empty)
   const [busy, setBusy] = useState<string | null>(null) // id of the action in progress
+  const [range, setRange] = useState<SyncRange>('new') // look-back for manual syncs
   const [message, setMessage] = useState<{ kind: 'notice' | 'error'; text: string } | null>(null)
 
   const refresh = useCallback(() => {
@@ -57,7 +58,7 @@ export function Connections({ reload }: Props) {
   async function sync(id?: string) {
     setBusy(id ?? 'all'); setMessage(null)
     try {
-      const res = await syncNow(id)
+      const res = await syncNow(id, range)
       const list = Object.values(res?.results ?? {}) as { status: string; new_count: number; error?: string }[]
       const total = list.reduce((s, r) => s + r.new_count, 0)
       const failed = list.filter((r) => r.status !== 'ok')
@@ -105,6 +106,20 @@ export function Connections({ reload }: Props) {
         <div className="row" style={{ marginBottom: 12 }}>
           <h2 style={{ margin: 0 }}>Connected accounts</h2>
           <span className="spacer" />
+          <label className="muted" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            Sync range
+            <select
+              className="range-select"
+              value={String(range)}
+              onChange={(e) => setRange(e.target.value === 'new' ? 'new' : (Number(e.target.value) as SyncRange))}
+              title="'New trades only' continues from the last sync. A day range re-checks that period; trades already in your journal are skipped."
+            >
+              <option value="new">New trades only</option>
+              <option value="30">Last 30 days</option>
+              <option value="60">Last 60 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+          </label>
           <button className="primary" disabled={!!busy || !conns.some((c) => c.enabled)} onClick={() => sync()}>
             {busy === 'all' ? 'Syncing…' : 'Sync all now'}
           </button>

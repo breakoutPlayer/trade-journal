@@ -80,4 +80,8 @@ export const addConnection = (input: {
 
 export const deleteConnection = (id: string) => invoke('connections', { action: 'delete', id })
 
-export const syncNow = (connectionId?: string) => invoke('sync', connectionId ? { connectionId } : {})
+export type SyncRange = 'new' | 30 | 60 | 90
+
+/** 'new' continues from the last sync; a number re-scans that many days (duplicates are skipped). */
+export const syncNow = (connectionId?: string, range: SyncRange = 'new') =>
+  invoke('sync', { ...(connectionId ? { connectionId } : {}), ...(range === 'new' ? {} : { days: range }) })
