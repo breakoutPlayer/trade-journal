@@ -8,8 +8,8 @@ import { NoteEditor } from '../components/NoteEditor'
 import { PriceChart } from '../components/PriceChart'
 import { customTag, useTradingTools, type Strategy as StrategyDef, type TagCategory } from '../lib/settings'
 
-type Tab = 'overview' | 'strategy' | 'risk' | 'notes'
-const TABS: [Tab, string][] = [['overview', 'Overview'], ['strategy', 'Strategy'], ['risk', 'Risk'], ['notes', 'Notes']]
+type Tab = 'overview' | 'strategy' | 'notes'
+const TABS: [Tab, string][] = [['overview', 'Overview'], ['strategy', 'Strategy'], ['notes', 'Notes']]
 
 interface Props {
   trade: Trade
@@ -26,7 +26,6 @@ interface Props {
 /** Full-page view of one trade: tabs on the left, chart screenshots on the right (TraderSync style). */
 export function TradeDetail({ trade, allSetups, allMistakes, reload, onBack, onEdit, onDeleted, prev, next }: Props) {
   const [tab, setTab] = useState<Tab>('overview')
-  const [adding, setAdding] = useState<'target' | 'stop' | null>(null)
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
   const tools = useTradingTools()
@@ -95,11 +94,6 @@ export function TradeDetail({ trade, allSetups, allMistakes, reload, onBack, onE
     return () => window.removeEventListener('paste', onPaste)
   }, [])
 
-  const goRisk = (kind: 'target' | 'stop') => {
-    setAdding(kind)
-    setTab('risk')
-  }
-
   return (
     <div className="td">
       <div className="td-top">
@@ -121,9 +115,8 @@ export function TradeDetail({ trade, allSetups, allMistakes, reload, onBack, onE
               <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>
             ))}
           </div>
-          {tab === 'overview' && <Overview trade={trade} allSetups={setups} allMistakes={mistakes} save={save} goRisk={goRisk} />}
+          {tab === 'overview' && <Overview trade={trade} allSetups={setups} allMistakes={mistakes} save={save} />}
           {tab === 'strategy' && <Strategy trade={trade} allSetups={setups} allMistakes={mistakes} save={save} strategies={tools.strategies} categories={tools.categories} />}
-          {tab === 'risk' && <Risk trade={trade} save={save} adding={adding} clearAdding={() => setAdding(null)} />}
           {tab === 'notes' && <Notes key={trade.id} trade={trade} save={save} onImages={addCharts} uploading={uploading} />}
         </aside>
         <ChartPane trade={trade} onFiles={addCharts} onRemove={removeChart} uploading={uploading} />
@@ -146,7 +139,7 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
   )
 }
 
-function Overview({ trade, allSetups, allMistakes, save, goRisk }: { trade: Trade; allSetups: string[]; allMistakes: string[]; save: Save; goRisk: (k: 'target' | 'stop') => void }) {
+function Overview({ trade, allSetups, allMistakes, save }: { trade: Trade; allSetups: string[]; allMistakes: string[]; save: Save }) {
   const n = netPnl(trade)
   const r = tradeReturn(trade)
   const st = tradeStatus(trade)
@@ -181,10 +174,17 @@ function Overview({ trade, allSetups, allMistakes, save, goRisk }: { trade: Trad
             <dt>Portfolio</dt><dd>{trade.exchange || '—'}</dd>
           </dl>
         </div>
-        <div className="td-two">
-          <button className="chip-btn" onClick={() => goRisk('target')}>+ Add target</button>
-          <button className="chip-btn" onClick={() => goRisk('stop')}>+ Add stop</button>
+        <div className="td-two td-levels">
+          <div>
+            <span className="label">Target</span>
+            <PriceList kind="target" entry={trade.entry_price == null ? null : Number(trade.entry_price)} size={Math.abs(size)} values={trade.targets ?? []} startOpen={false} onOpened={noop} onChange={(v) => save({ targets: v })} />
+          </div>
+          <div>
+            <span className="label">Stop</span>
+            <PriceList kind="stop" entry={trade.entry_price == null ? null : Number(trade.entry_price)} size={Math.abs(size)} values={trade.stops ?? []} startOpen={false} onOpened={noop} onChange={(v) => save({ stops: v })} />
+          </div>
         </div>
+        <RiskReward trade={trade} />
       </Section>
       <Section title="Setups">
         <ChipEditor kind="setup" values={trade.tags ?? []} suggestions={allSetups} onChange={(tags) => save({ tags })} />
@@ -315,34 +315,26 @@ function ChipEditor({ kind, values, suggestions, onChange }: { kind: 'setup' | '
   )
 }
 
-function Risk({ trade, save, adding, clearAdding }: { trade: Trade; save: Save; adding: 'target' | 'stop' | null; clearAdding: () => void }) {
+const noop = () => {}
+
+/** Initial risk $, planned R:R (first target vs first stop) and realized R. */
+function RiskReward({ trade }: { trade: Trade }) {
   const entry = trade.entry_price == null ? null : Number(trade.entry_price)
   const size = Math.abs(Number(trade.size) || 0)
-  const targets = trade.targets ?? []
-  const stops = trade.stops ?? []
-  const n = netPnl(trade)
-  const riskPer = entry != null && stops.length ? Math.abs(entry - Number(stops[0])) : null
+  const target = trade.targets?.length ? Number(trade.targets[0]) : null
+  const stop = trade.stops?.length ? Number(trade.stops[0]) : null
+  const riskPer = entry != null && stop != null ? Math.abs(entry - stop) : null
+  const rewardPer = entry != null && target != null ? Math.abs(target - entry) : null
   const riskUsd = riskPer != null && size ? riskPer * size : null
-  const rewardPer = entry != null && targets.length ? Math.abs(Number(targets[0]) - entry) : null
-  const closed = tradeStatus(trade) !== 'OPEN'
+  const rr = riskPer && rewardPer != null ? rewardPer / riskPer : null
+  const n = netPnl(trade)
+  const realized = riskUsd && tradeStatus(trade) !== 'OPEN' ? n / riskUsd : null
   return (
-    <>
-      <Section title="Targets">
-        <PriceList kind="target" entry={entry} size={size} values={targets} startOpen={adding === 'target'} onOpened={clearAdding} onChange={(v) => save({ targets: v })} />
-      </Section>
-      <Section title="Stops">
-        <PriceList kind="stop" entry={entry} size={size} values={stops} startOpen={adding === 'stop'} onOpened={clearAdding} onChange={(v) => save({ stops: v })} />
-      </Section>
-      {(riskUsd != null || rewardPer != null) && (
-        <Section title="Risk / reward">
-          <dl className="kv">
-            <dt>Initial risk $</dt><dd>{riskUsd != null ? fmtMoney(riskUsd, false) : '—'}</dd>
-            <dt>Planned R:R</dt><dd>{riskPer && rewardPer != null ? `1 : ${(rewardPer / riskPer).toFixed(2)}` : '—'}</dd>
-            <dt>Realized R</dt><dd className={pnlClass(n)}>{riskUsd && closed ? `${(n / riskUsd).toFixed(2)}R` : '—'}</dd>
-          </dl>
-        </Section>
-      )}
-    </>
+    <div className="td-rr">
+      <div><span className="label">Initial risk ($)</span><b>{riskUsd != null ? `$${fmtMoney(riskUsd, false)}` : '—'}</b></div>
+      <div><span className="label">Planned R:R</span><b>{rr != null ? `1 : ${rr.toFixed(2)}` : '—'}</b></div>
+      <div><span className="label">Realized R</span><b className={realized != null ? pnlClass(realized) : ''}>{realized != null ? `${realized >= 0 ? '+' : ''}${realized.toFixed(2)}R` : '—'}</b></div>
+    </div>
   )
 }
 
@@ -414,8 +406,8 @@ function ChartPane({ trade, onFiles, onRemove, uploading }: { trade: Trade; onFi
   const [over, setOver] = useState(false)
   const file = useRef<HTMLInputElement>(null)
   const cur = paths[Math.min(idx, paths.length - 1)]
-  // Screenshots or the live price chart; default to the chart when there are no screenshots.
-  const [view, setView] = useState<'shots' | 'price'>(paths.length ? 'shots' : 'price')
+  // Price chart first (default), screenshots beside it.
+  const [view, setView] = useState<'shots' | 'price'>('price')
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault()
@@ -431,8 +423,8 @@ function ChartPane({ trade, onFiles, onRemove, uploading }: { trade: Trade; onFi
       onDrop={onDrop}
     >
       <div className="seg td-view" role="tablist">
-        <button role="tab" aria-selected={view === 'shots'} className={view === 'shots' ? 'on' : ''} onClick={() => setView('shots')}>Screenshots{paths.length ? ` (${paths.length})` : ''}</button>
         <button role="tab" aria-selected={view === 'price'} className={view === 'price' ? 'on' : ''} onClick={() => setView('price')}>Price chart</button>
+        <button role="tab" aria-selected={view === 'shots'} className={view === 'shots' ? 'on' : ''} onClick={() => setView('shots')}>Screenshots{paths.length ? ` (${paths.length})` : ''}</button>
       </div>
       {view === 'price' ? <PriceChart trade={trade} /> : <>
       {error && <div className="error">{error}</div>}
