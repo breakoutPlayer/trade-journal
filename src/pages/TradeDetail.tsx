@@ -5,6 +5,7 @@ import { checkChartFile, removeCharts, uploadChart, useChartUrls } from '../lib/
 import { fmtDateTime, fmtMoney, fmtNum, pnlClass } from '../lib/format'
 import { Lightbox } from '../components/Charts'
 import { NoteEditor } from '../components/NoteEditor'
+import { PriceChart } from '../components/PriceChart'
 import { customTag, useTradingTools, type Strategy as StrategyDef, type TagCategory } from '../lib/settings'
 
 type Tab = 'overview' | 'strategy' | 'risk' | 'notes'
@@ -413,6 +414,8 @@ function ChartPane({ trade, onFiles, onRemove, uploading }: { trade: Trade; onFi
   const [over, setOver] = useState(false)
   const file = useRef<HTMLInputElement>(null)
   const cur = paths[Math.min(idx, paths.length - 1)]
+  // Screenshots or the live price chart; default to the chart when there are no screenshots.
+  const [view, setView] = useState<'shots' | 'price'>(paths.length ? 'shots' : 'price')
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault()
@@ -427,6 +430,11 @@ function ChartPane({ trade, onFiles, onRemove, uploading }: { trade: Trade; onFi
       onDragLeave={() => setOver(false)}
       onDrop={onDrop}
     >
+      <div className="seg td-view" role="tablist">
+        <button role="tab" aria-selected={view === 'shots'} className={view === 'shots' ? 'on' : ''} onClick={() => setView('shots')}>Screenshots{paths.length ? ` (${paths.length})` : ''}</button>
+        <button role="tab" aria-selected={view === 'price'} className={view === 'price' ? 'on' : ''} onClick={() => setView('price')}>Price chart</button>
+      </div>
+      {view === 'price' ? <PriceChart trade={trade} /> : <>
       {error && <div className="error">{error}</div>}
       {cur ? (
         <>
@@ -449,6 +457,7 @@ function ChartPane({ trade, onFiles, onRemove, uploading }: { trade: Trade; onFi
           <span className="muted">Click to choose, drop an image here, or paste with Ctrl+V</span>
         </button>
       )}
+      </>}
       <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => { onFiles([...(e.target.files ?? [])]); e.target.value = '' }} />
       {zoom && cur && urls[cur] && <Lightbox src={urls[cur]} onClose={() => setZoom(false)} />}
     </section>
