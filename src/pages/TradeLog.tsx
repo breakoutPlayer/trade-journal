@@ -5,6 +5,7 @@ import { fmtMoney, fmtNum, fmtPct, pnlClass } from '../lib/format'
 import { summarize } from '../lib/stats'
 import { TradeForm } from '../components/TradeForm'
 import { removeCharts } from '../lib/charts'
+import { accountOf } from '../lib/accounts'
 import { TradeDetail } from './TradeDetail'
 
 interface Props {
@@ -29,9 +30,9 @@ export function TradeLog({ trades, reload, openId, setOpenId }: Props) {
 
   const allSetups = useMemo(() => [...new Set(trades.flatMap((t) => t.tags ?? []))].sort(), [trades])
   const allMistakes = useMemo(() => [...new Set(trades.flatMap((t) => t.mistakes ?? []))].sort(), [trades])
-  // "Exchange · Account" pairs from synced trades.
-  const accountKey = (t: Trade) => (t.account ? `${t.exchange ?? ''} · ${t.account}` : '')
-  const allAccounts = useMemo(() => [...new Set(trades.map(accountKey).filter(Boolean))].sort(), [trades])
+  // Same account names as the dashboard and Settings → Accounts (synced, manual and CSV trades).
+  const accountKey = accountOf
+  const allAccounts = useMemo(() => [...new Set(trades.map(accountOf))].sort(), [trades])
 
   const q = search.trim().toLowerCase()
   const shown = useMemo(() => {
@@ -122,7 +123,7 @@ export function TradeLog({ trades, reload, openId, setOpenId }: Props) {
           <option value="long">Long</option>
           <option value="short">Short</option>
         </select>
-        {allAccounts.length > 0 && (
+        {allAccounts.length > 1 && (
           <select className="range-select" value={account} onChange={(e) => setAccount(e.target.value)} aria-label="Account">
             <option value="">All accounts</option>
             {allAccounts.map((a) => <option key={a} value={a}>{a}</option>)}

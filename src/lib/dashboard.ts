@@ -204,3 +204,62 @@ export function performanceScore(s: {
   ]
   return { score: axes.reduce((a, x) => a + x.value, 0) / axes.length, axes }
 }
+
+// ---------- Drawdown widgets ----------
+
+export interface Drawdown {
+  amount: number // <= 0, dollars below the prior equity peak
+  pct: number | null // amount / peak equity, when the peak is above 0
+  date: Date | null
+}
+
+/**
+ * Drawdowns on the trade-by-trade equity curve (cumulative net P&L, starting at 0).
+ * An episode runs from a new equity high until equity gets back to that high.
+ * - max: deepest point of any episode (date = when the low was hit)
+ * - average: mean depth of all episodes, including one still in progress
+ * - current: how far equity is below its high right now (date = latest trade)
+ */
+export function drawdownStats(trades: Trade[], startBalance: number | null = null, transfers: { at: string; amount: number }[] = []): { max: Drawdown; average: Drawdown; current: Drawdown; episodes: number } {
+  const sorted = [...trades].sort((a, b) => tradeTime(a).getTime() - tradeTime(b).getTime())
+  let equity = 0, peak = 0
+  // Account balance at a point in time = starting balance + deposits/withdrawals so far + trading P&L.
+  const useBalance = (startBalance ?? 0) > 0 || transfers.length > 0
+  const moves = [...transfers].map((t) => ({ at: Date.parse(t.at), amount: t.amount })).sort((a, b) => a.at - b.at)
+  let mi = 0, deposited = 0
+  let peakBase = startBalance ?? 0 // balance excluding P&L, at the time of the current equity peak
+  // With a balance: % of the account balance at the peak. Otherwise % of the P&L peak.
+  const pctOf = (dd: number, pk: number, base = peakBase) => {
+    if (useBalance) { const bal = base + pk; return bal > 0 ? dd / bal : null }
+    return pk > 0 ? dd / pk : null
+  }
+  let max: Drawdown = { amount: 0, pct: null, date: null }
+  const episodes: { depth: number; peak: number; base: number }[] = []
+  let ep: { depth: number; peak: number; base: number } | null = null
+  for (const t of sorted) {
+    const when = tradeTime(t).getTime()
+    while (mi < moves.length && moves[mi].at <= when) deposited += moves[mi++].amount
+    equity += netPnl(t)
+    if (equity >= peak) {
+      if (ep) { episodes.push(ep); ep = null }
+      peak = equity
+      peakBase = (startBalance ?? 0) + deposited
+      continue
+    }
+    const dd = equity - peak
+    if (!ep) ep = { depth: dd, peak, base: peakBase }
+    if (dd < ep.depth) ep.depth = dd
+    if (dd < max.amount) max = { amount: dd, pct: pctOf(dd, peak), date: tradeTime(t) }
+  }
+  if (ep) episodes.push(ep)
+  const avg = episodes.length ? episodes.reduce((a, e) => a + e.depth, 0) / episodes.length : 0
+  const avgPeak = episodes.length ? episodes.reduce((a, e) => a + e.peak, 0) / episodes.length : 0
+  const avgBase = episodes.length ? episodes.reduce((a, e) => a + e.base, 0) / episodes.length : 0
+  const last = sorted.length ? tradeTime(sorted[sorted.length - 1]) : null
+  return {
+    max,
+    average: { amount: avg, pct: episodes.length ? pctOf(avg, avgPeak, avgBase) : null, date: null },
+    current: { amount: Math.min(0, equity - peak), pct: pctOf(Math.min(0, equity - peak), peak), date: last },
+    episodes: episodes.length,
+  }
+}

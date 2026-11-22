@@ -774,3 +774,27 @@ main:has(> .td) { max-width: none; }
 .td-rr > div { display: grid; gap: 3px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); min-width: 0; }
 .td-rr .label { font-size: 11px; color: var(--muted); }
 .td-rr b { font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Drawdown widgets */
+.dd-card { display: grid; align-content: start; gap: 8px; }
+.dd-card h3 { cursor: help; }
+.dd-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dd-main b { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
+.dd-pct { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 7px; background: var(--loss-bg); color: var(--loss); }
+.dd-sub { font-size: 13px; color: #a9a2ff; }
+
+/* Settings → Accounts */
+.acct-row .set-hint { margin-left: 8px; }
+@media (max-width: 860px) {
+  .set-row.acct-row { grid-template-columns: minmax(0, 1fr) 90px 90px 48px; }
+}
+.set-row.acct-row { grid-template-columns: minmax(0, 1.4fr) 120px 100px 110px 120px 56px; }
+.set-row.xfer-row { grid-template-columns: 110px minmax(0, 1fr) 120px 40px; }
+.xfer-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.xfer-form .seg { justify-self: start; }
+@media (max-width: 860px) {
+  .set-row.acct-row { grid-template-columns: minmax(0, 1fr) 90px 90px 48px; }
+  .set-row.acct-row > :nth-child(3), .set-row.acct-row > :nth-child(5) { display: none; }
+  .xfer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .set-row.xfer-row { grid-template-columns: 84px minmax(0, 1fr) 90px 32px; }
+}

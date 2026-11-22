@@ -3,7 +3,7 @@ import type { Trade } from '../lib/types'
 import type { Summary } from '../lib/stats'
 import { dayKey, netPnl, tradeTime } from '../lib/trades'
 import { pnlClass } from '../lib/format'
-import { dailyCumulative, performanceScore, weekdaySummary } from '../lib/dashboard'
+import { dailyCumulative, drawdownStats, performanceScore, weekdaySummary } from '../lib/dashboard'
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many)
 const tiny = (n: number) => {
@@ -318,5 +318,32 @@ export function PerformanceSummary({ trades }: { trades: Trade[] }) {
         </div>
       </div>
     </section>
+  )
+}
+
+// ---------- Drawdown widgets ----------
+
+const ddDate = (d: Date | null) => (d ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—')
+const pctBadge = (p: number | null) => (p == null ? null : <span className="dd-pct">{(p * 100).toFixed(0)}%</span>)
+
+/** Average and maximum drawdown cards (two grid cells). */
+export function DrawdownWidgets({ trades, startBalance = null, transfers = [] }: { trades: Trade[]; startBalance?: number | null; transfers?: { at: string; amount: number }[] }) {
+  const dd = useMemo(() => drawdownStats(trades, startBalance, transfers), [trades, startBalance, transfers])
+  const tip = startBalance || transfers.length
+    ? `% is of the account balance at the peak (starting balance${transfers.length ? ' + deposits/withdrawals so far' : ''} + net P&L at that high).`
+    : '% is of the equity peak (cumulative net P&L at its high); hidden when that peak is $0 or less. Set a starting balance in Settings → Accounts to see % of balance.'
+  return (
+    <>
+      <section className="widget span-1 dd-card">
+        <h3 title={`Average depth of ${dd.episodes} drawdown(s): each runs from an equity high until it is regained. ${tip}`}>Average drawdown ⓘ</h3>
+        <div className="dd-main"><b className={dd.average.amount < 0 ? 'loss' : ''}>{usd(dd.average.amount)}</b>{pctBadge(dd.average.pct)}</div>
+        <div className="dd-sub">Current ({ddDate(dd.current.date)}): <span className={dd.current.amount < 0 ? 'loss' : 'win'}>{usd(dd.current.amount)}</span></div>
+      </section>
+      <section className="widget span-1 dd-card">
+        <h3 title={`Largest drop from an equity high to a later low. ${tip}`}>Max drawdown ⓘ</h3>
+        <div className="dd-main"><b className={dd.max.amount < 0 ? 'loss' : ''}>{usd(dd.max.amount)}</b>{pctBadge(dd.max.pct)}</div>
+        <div className="dd-sub">{dd.max.date ? ddDate(dd.max.date) : 'No drawdown yet'}</div>
+      </section>
+    </>
   )
 }

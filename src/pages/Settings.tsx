@@ -1,13 +1,15 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import type { Trade } from '../lib/types'
+import { accountOf, addTransfer, deleteTransfer, saveBalance, transferTotals, useAccountBalances } from '../lib/accounts'
+import { netPnl } from '../lib/trades'
 import {
   COLORS, addCategory, addLabel, changeCategoryTag, customTag, deleteCategory, deleteLabel, deleteStrategy,
   friendlyNameError, saveCategory, saveLabel, saveStrategy, setCategoryTags, useTradingTools,
   type Label, type LabelKind, type Strategy, type TagCategory,
 } from '../lib/settings'
 
-type Section = 'setups' | 'mistakes' | 'tags' | 'strategies'
-const SECTIONS: [Section, string][] = [['setups', 'Setups'], ['mistakes', 'Mistakes'], ['tags', 'Custom Tags'], ['strategies', 'My Strategies']]
+type Section = 'accounts' | 'setups' | 'mistakes' | 'tags' | 'strategies'
+const SECTIONS: [Section, string][] = [['accounts', 'Accounts'], ['setups', 'Setups'], ['mistakes', 'Mistakes'], ['tags', 'Custom Tags'], ['strategies', 'My Strategies']]
 
 interface Props {
   trades: Trade[]
@@ -15,7 +17,7 @@ interface Props {
 }
 
 export function Settings({ trades, reload }: Props) {
-  const [section, setSection] = useState<Section>('setups')
+  const [section, setSection] = useState<Section>('accounts')
   const tools = useTradingTools()
   const refresh = () => { tools.reload(); reload() }
 
@@ -23,15 +25,18 @@ export function Settings({ trades, reload }: Props) {
     <div className="settings">
       <nav className="settings-nav" aria-label="Settings">
         <div className="settings-title">Settings</div>
+        <div className="settings-group">Account</div>
+        <button className={section === 'accounts' ? 'active' : ''} onClick={() => setSection('accounts')}>Accounts</button>
         <div className="settings-group">Trading tools &amp; strategies</div>
-        {SECTIONS.map(([id, label]) => (
+        {SECTIONS.filter(([id]) => id !== 'accounts').map(([id, label]) => (
           <button key={id} className={section === id ? 'active' : ''} onClick={() => setSection(id)}>{label}</button>
         ))}
       </nav>
       <div className="settings-body">
-        <div className="settings-crumb">Trading tools &amp; strategies</div>
+        <div className="settings-crumb">{section === 'accounts' ? 'Account' : 'Trading tools & strategies'}</div>
         <h1>{SECTIONS.find(([id]) => id === section)![1]}</h1>
         {tools.error && <div className="panel error">{tools.error}</div>}
+        {section === 'accounts' && <Accounts trades={trades} />}
         {section === 'setups' && <LabelList kind="setup" labels={tools.labels} trades={trades} refresh={refresh} />}
         {section === 'mistakes' && <LabelList kind="mistake" labels={tools.labels} trades={trades} refresh={refresh} />}
         {section === 'tags' && <Categories categories={tools.categories} trades={trades} refresh={refresh} />}
@@ -91,6 +96,143 @@ function Header({ children, onAdd, adding }: { children?: ReactNode; onAdd: () =
       <span className="spacer" />
       <button className="chip-btn" disabled={adding} onClick={onAdd}>Add new +</button>
     </div>
+  )
+}
+
+// ---------- accounts ----------
+
+function Accounts({ trades }: { trades: Trade[] }) {
+  const { balances, transfers, error, reload } = useAccountBalances()
+  const moved = useMemo(() => transferTotals(transfers), [transfers])
+  const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [text, setText] = useState('')
+  const act = useAction()
+  const money = (n: number) => `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+  const rows = useMemo(() => {
+    const m = new Map<string, { count: number; net: number }>()
+    for (const t of trades) {
+      const k = accountOf(t)
+      const cur = m.get(k) ?? { count: 0, net: 0 }
+      cur.count++; cur.net += netPnl(t)
+      m.set(k, cur)
+    }
+    for (const k of [...Object.keys(balances), ...Object.keys(moved)]) if (!m.has(k)) m.set(k, { count: 0, net: 0 })
+    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [trades, balances, moved])
+
+  const start = (key: string) => { setEditing(key); setText(balances[key] ? String(balances[key]) : '') }
+  const save = async (e: FormEvent, key: string) => {
+    e.preventDefault()
+    const v = text.trim() === '' ? null : Number(text.replace(/[$,\s]/g, ''))
+    if (v != null && !(v > 0)) return act.run(async () => { throw new Error('Enter a balance above 0, or leave it empty to clear it.') })
+    if (await act.run(() => saveBalance(key, v))) { setEditing(null); reload() }
+  }
+
+  return (
+    <>
+      <p className="muted set-intro">
+        Set the starting balance of each account (what it held before the trades in your journal). It is used to show
+        drawdowns as a % of your balance and the account's current balance. Record deposits and withdrawals so the
+        balance stays right; they don't count as trading profit.
+      </p>
+      {(error || act.error) && <div className="panel error">{error || act.error}</div>}
+      <div className="set-table">
+        <div className="set-row set-th acct-row"><span>Account</span><span className="num">Starting balance</span><span className="num">Deposits</span><span className="num">Net P&amp;L</span><span className="num">Current</span><span /></div>
+        {rows.length === 0 && <p className="set-empty">No accounts yet. They appear once you have trades.</p>}
+        {rows.map(([key, r]) => {
+          const bal = balances[key]
+          return editing === key ? (
+            <form key={key} className="set-form" onSubmit={(e) => save(e, key)}>
+              <span className="set-name" style={{ flex: '1 1 160px' }}>{key}</span>
+              <input autoFocus inputMode="decimal" placeholder="e.g. 1000" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setEditing(null)} style={{ flex: '0 1 160px' }} aria-label={`Starting balance for ${key}`} />
+              <button type="button" className="chip-btn" onClick={() => setEditing(null)}>Cancel</button>
+              <button className="primary" disabled={act.busy}>{act.busy ? 'Saving…' : 'Save'}</button>
+            </form>
+          ) : (
+            <div key={key} className="set-row acct-row">
+              <span className="set-name">{key}<span className="muted set-hint">{r.count} {r.count === 1 ? 'trade' : 'trades'}</span></span>
+              <span className="num">{bal ? money(bal) : <span className="muted">Not set</span>}</span>
+              <span className="num">{moved[key] ? money(moved[key]) : <span className="muted">—</span>}</span>
+              <span className={`num ${r.net > 0 ? 'win' : r.net < 0 ? 'loss' : ''}`}>{money(r.net)}</span>
+              <span className="num">{bal || moved[key] ? money((bal ?? 0) + (moved[key] ?? 0) + r.net) : '—'}</span>
+              <span className="set-actions">
+                <button className="link-muted" onClick={() => start(key)} aria-label={`Set balance for ${key}`} title="Set balance">✎</button>
+                {bal && <button className="link-muted" onClick={async () => { if (confirm(`Clear the starting balance of ${key}?`) && await act.run(() => saveBalance(key, null))) reload() }} aria-label={`Clear balance for ${key}`} title="Clear">🗑</button>}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="set-head" style={{ marginTop: 18 }}>
+        <h2 style={{ margin: 0, fontSize: 16 }}>Deposits &amp; withdrawals</h2>
+        <span className="spacer" />
+        <button className="chip-btn" disabled={adding || rows.length === 0} onClick={() => setAdding(true)}>+ Deposit / withdrawal</button>
+      </div>
+      {adding && (
+        <TransferForm accounts={rows.map(([k]) => k)} busy={act.busy} onCancel={() => setAdding(false)}
+          onSave={async (key, amount, at, note) => { if (await act.run(() => addTransfer(key, amount, at, note))) { setAdding(false); reload() } }} />
+      )}
+      <div className="set-table">
+        {transfers.length === 0 && !adding && <p className="set-empty">No deposits or withdrawals yet.</p>}
+        {transfers.map((t) => (
+          <div key={t.id} className="set-row xfer-row">
+            <span>{new Date(t.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            <span className="set-name">{t.account_key}{t.note && <span className="muted set-hint">{t.note}</span>}</span>
+            <span className={`num ${t.amount > 0 ? 'win' : 'loss'}`}>{t.amount > 0 ? '+' : ''}{money(t.amount)}</span>
+            <span className="set-actions">
+              <button className="link-muted" title="Delete" aria-label={`Delete ${t.amount > 0 ? 'deposit' : 'withdrawal'} of ${money(Math.abs(t.amount))}`}
+                onClick={async () => { if (confirm(`Delete this ${t.amount > 0 ? 'deposit' : 'withdrawal'} of ${money(Math.abs(t.amount))}?`) && await act.run(() => deleteTransfer(t.id))) reload() }}>🗑</button>
+            </span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function TransferForm({ accounts, busy, onSave, onCancel }: {
+  accounts: string[]; busy: boolean
+  onSave: (account: string, amount: number, at: Date, note: string) => void; onCancel: () => void
+}) {
+  const today = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const [account, setAccount] = useState(accounts[0] ?? '')
+  const [kind, setKind] = useState<'deposit' | 'withdrawal'>('deposit')
+  const [amount, setAmount] = useState('')
+  const [date, setDate] = useState(`${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`)
+  const [note, setNote] = useState('')
+  const value = Number(amount.replace(/[$,\s]/g, ''))
+  const ok = account && value > 0 && date
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!ok) return
+    const [y, m, d] = date.split('-').map(Number)
+    // Noon local time, so the deposit lands on the chosen day in any time zone view.
+    onSave(account, kind === 'deposit' ? value : -value, new Date(y, m - 1, d, 12), note)
+  }
+  return (
+    <form className="set-table set-card set-strategy xfer-form" onSubmit={submit}>
+      <div className="seg" role="radiogroup" aria-label="Type">
+        <button type="button" role="radio" aria-checked={kind === 'deposit'} className={kind === 'deposit' ? 'on' : ''} onClick={() => setKind('deposit')}>Deposit</button>
+        <button type="button" role="radio" aria-checked={kind === 'withdrawal'} className={kind === 'withdrawal' ? 'on' : ''} onClick={() => setKind('withdrawal')}>Withdrawal</button>
+      </div>
+      <div className="xfer-grid">
+        <label>Account
+          <select value={account} onChange={(e) => setAccount(e.target.value)}>{accounts.map((a) => <option key={a} value={a}>{a}</option>)}</select>
+        </label>
+        <label>Amount ($)<input autoFocus inputMode="decimal" placeholder="e.g. 500" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+        <label>Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+        <label>Note (optional)<input maxLength={200} placeholder="e.g. Monthly top-up" value={note} onChange={(e) => setNote(e.target.value)} /></label>
+      </div>
+      <div className="row">
+        <span className="spacer" />
+        <button type="button" className="chip-btn" onClick={onCancel}>Cancel</button>
+        <button className="primary" disabled={busy || !ok}>{busy ? 'Saving…' : kind === 'deposit' ? 'Add deposit' : 'Add withdrawal'}</button>
+      </div>
+    </form>
   )
 }
 

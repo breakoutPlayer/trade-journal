@@ -1,14 +1,15 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import type { Trade } from '../lib/types'
+import { accountOf, balanceBasis, useAccountBalances } from '../lib/accounts'
 import { equityCurve, groupStats, summarize } from '../lib/stats'
 import { dayKey, tradeTime } from '../lib/trades'
 import { fmtMoney, fmtMoneyShort, fmtPct, pnlClass } from '../lib/format'
 import {
   currentDrawdownPct, currentStreak, holdTimePnl, hourlyPnl, monthlyPnl,
-  volumeBySymbol, weekdayPnl, weekStart, entryPriceBuckets, changePctBuckets, volumeBuckets, yearMonths,
+  volumeBySymbol, weekdayPnl, weekStart, changePctBuckets, yearMonths,
   type Bar,
 } from '../lib/dashboard'
-import { CalendarCard, CumulativeCard, PerformanceSummary, ScoreCard, StatCards } from '../components/DashboardWidgets'
+import { CalendarCard, CumulativeCard, DrawdownWidgets, PerformanceSummary, ScoreCard, StatCards } from '../components/DashboardWidgets'
 import { BarChart } from '../components/BarChart'
 
 type Range = 'all' | '7d' | '30d' | 'month' | 'year'
@@ -129,13 +130,6 @@ function Gauge({ value, label }: { value: number | null; label: string }) {
 const ALL = '__all__'
 const ACCOUNT_KEY = 'tidemark.dashboard.account'
 
-/** "Bitunix · Main" for synced trades, the exchange for manual/CSV trades, else "No account". */
-export function accountOf(t: Pick<Trade, 'exchange' | 'account'>) {
-  const ex = t.exchange?.trim()
-  if (t.account) return `${ex || 'Unknown'} · ${t.account}`
-  return ex || 'No account'
-}
-
 export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
   const [range, setRange] = useState<Range>('all')
   const [riskRange, setRiskRange] = useState<'today' | 'week'>('today')
@@ -149,6 +143,13 @@ export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
     return [...m.entries()].sort(([a], [b]) => a.localeCompare(b))
   }, [everyTrade])
   const active = account !== ALL && accounts.some(([a]) => a === account) ? account : ALL
+
+  // Balance used for the drawdown % (see balanceBasis for the rules with several accounts).
+  const { balances, transfers } = useAccountBalances()
+  const basis = useMemo(
+    () => balanceBasis(active === ALL ? null : active, accounts.map(([a]) => a), balances, transfers),
+    [active, accounts, balances, transfers],
+  )
 
   // Every widget below (including risk status) works on the selected account only.
   const allTrades = useMemo(
@@ -193,7 +194,6 @@ export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
 
   const lossRate = s.count ? s.losses / s.count : 0
   const expectancy = s.winRate * s.avgWin + lossRate * s.avgLoss // avgLoss is negative
-  const open = trades.filter((t) => !t.closed_at && t.exit_price == null)
   const safety = s.count >= 5
     ? 100 * (0.4 * Math.min(1, s.winRate / 0.52) + 0.3 * Math.min(1, (s.profitFactor === Infinity ? 2 : s.profitFactor) / 1.5) + 0.3 * Math.min(1, s.avgLoss ? s.avgWin / -s.avgLoss : 1))
     : null
@@ -238,7 +238,7 @@ export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
               <div><div className="label">Worst trade</div><div className={`big ${pnlClass(s.worst)}`}>{fmtMoney(s.worst)}</div></div>
               <div><div className="label">Avg win</div><div className="big win">{fmtMoney(s.avgWin)}</div></div>
               <div><div className="label">Avg loss</div><div className={`big ${s.avgLoss ? 'loss' : ''}`}>{fmtMoney(s.avgLoss)}</div></div>
-              <div><div className="label">Max drawdown</div><div className={`big ${s.maxDrawdown ? 'loss' : ''}`}>{fmtMoney(-s.maxDrawdown)}</div></div>
+              <div><div className="label">Max DD</div><div className={`big ${s.maxDrawdown ? 'loss' : ''}`}>{fmtMoney(-s.maxDrawdown)}</div></div>
               <div><div className="label">Fees paid</div><div className="big">{fmtMoney(s.fees, false)}</div></div>
             </div>
           </Widget>
@@ -298,23 +298,13 @@ export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
 
           <Widget title="Yearly calendar" className="span-4"><YearCalendar trades={trades} /></Widget>
 
-          <Widget title="Entry price" className="span-1"><DistList data={entryPriceBuckets(trades)} /></Widget>
-          <Widget title="Volume change" className="span-1"><DistList data={volumeBuckets(trades)} /></Widget>
+          <DrawdownWidgets trades={trades} startBalance={basis.startBalance} transfers={basis.transfers} />
           <Widget title="Change percent" className="span-1"><DistList data={changePctBuckets(trades)} /></Widget>
-          <Widget title="Open positions" className="span-1">
-            {open.length ? (
-              <div className="dist">
-                {open.slice(0, 8).map((t) => (
-                  <div key={t.id} className="dist-top"><span>{t.symbol} <span className="muted">{t.side ?? ''}</span></span><b>{t.size ?? ''} @ {t.entry_price ?? '—'}</b></div>
-                ))}
-              </div>
-            ) : <div className="widget-empty">No open positions</div>}
-          </Widget>
 
           <Widget title="Weekday" className="span-1"><BarChart data={weekdayPnl(trades)} /></Widget>
           <Widget title="Hourly" className="span-1"><BarChart data={hourlyPnl(trades)} /></Widget>
           <Widget title="Hold time" className="span-1"><BarChart data={holdTimePnl(trades)} /></Widget>
-          <Widget title="Monthly" className="span-1"><BarChart data={monthlyPnl(trades)} /></Widget>
+          <Widget title="Monthly" className="span-2"><BarChart data={monthlyPnl(trades)} /></Widget>
         </div>
         </>
       )}
