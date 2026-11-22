@@ -12,12 +12,13 @@ import { Calendar } from './pages/Calendar'
 import { Analytics } from './pages/Analytics'
 import { Journal } from './pages/Journal'
 import { Connections } from './pages/Connections'
+import { Settings } from './pages/Settings'
 import { Logo } from './components/Logo'
 import { NavIcon } from './components/NavIcon'
 
 const TABS = ['Dashboard', 'Trades', 'Journal', 'Calendar', 'Analytics', 'Import', 'Connections'] as const
 const TAB_LABELS: Record<(typeof TABS)[number], string> = { Dashboard: 'Dashboard', Trades: 'Trades', Journal: 'Journal', Calendar: 'Calendar', Analytics: 'Reports', Import: 'Import', Connections: 'Connections' }
-type Tab = (typeof TABS)[number]
+type Tab = (typeof TABS)[number] | 'Settings'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -92,6 +93,9 @@ export default function App() {
         </nav>
         <div className="account">
           <span className="who">{session.user.email}</span>
+          <button className={tab === 'Settings' ? 'active' : ''} onClick={() => { setTab('Settings'); setOpenTradeId(null) }} title="Settings" aria-label="Settings">
+            <span className="nav-text">Settings</span><NavIcon name="Settings" />
+          </button>
           <button onClick={() => downloadBackup(trades)} disabled={!trades.length} title="Download all trades as JSON">
             <span className="nav-text">Backup</span><NavIcon name="Import" />
           </button>
@@ -107,6 +111,7 @@ export default function App() {
         {tab === 'Analytics' && <Analytics trades={trades} />}
         {tab === 'Import' && <Import trades={trades} reload={reload} />}
         {tab === 'Connections' && <Connections reload={reload} />}
+        {tab === 'Settings' && <Settings trades={trades} reload={reload} />}
       </main>
     </>
   )

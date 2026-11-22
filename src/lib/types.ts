@@ -22,6 +22,9 @@ export interface Trade {
   // Set by exchange auto-sync (see supabase/migrations). Null for manual/CSV trades.
   external_id?: string | null
   account?: string | null // connection label, e.g. "Main"
+  // Settings → Trading Tools (see supabase/migrations/20261123000000_trading_tools.sql)
+  custom_tags?: string[] | null // "Category: tag"
+  strategy_id?: string | null
   created_at: string
 }
 

@@ -5,6 +5,7 @@ import { checkChartFile, removeCharts, uploadChart, useChartUrls } from '../lib/
 import { fmtDateTime, fmtMoney, fmtNum, pnlClass } from '../lib/format'
 import { Lightbox } from '../components/Charts'
 import { NoteEditor } from '../components/NoteEditor'
+import { customTag, useTradingTools, type Strategy as StrategyDef, type TagCategory } from '../lib/settings'
 
 type Tab = 'overview' | 'strategy' | 'risk' | 'notes'
 const TABS: [Tab, string][] = [['overview', 'Overview'], ['strategy', 'Strategy'], ['risk', 'Risk'], ['notes', 'Notes']]
@@ -27,6 +28,10 @@ export function TradeDetail({ trade, allSetups, allMistakes, reload, onBack, onE
   const [adding, setAdding] = useState<'target' | 'stop' | null>(null)
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
+  const tools = useTradingTools()
+  const defined = (kind: 'setup' | 'mistake') => tools.labels.filter((l) => l.kind === kind).map((l) => l.name)
+  const setups = [...new Set([...defined('setup'), ...allSetups])]
+  const mistakes = [...new Set([...defined('mistake'), ...allMistakes])]
 
   async function save(patch: Partial<TradeInput>) {
     setError('')
@@ -115,8 +120,8 @@ export function TradeDetail({ trade, allSetups, allMistakes, reload, onBack, onE
               <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>
             ))}
           </div>
-          {tab === 'overview' && <Overview trade={trade} allSetups={allSetups} allMistakes={allMistakes} save={save} goRisk={goRisk} />}
-          {tab === 'strategy' && <Strategy trade={trade} allSetups={allSetups} allMistakes={allMistakes} save={save} />}
+          {tab === 'overview' && <Overview trade={trade} allSetups={setups} allMistakes={mistakes} save={save} goRisk={goRisk} />}
+          {tab === 'strategy' && <Strategy trade={trade} allSetups={setups} allMistakes={mistakes} save={save} strategies={tools.strategies} categories={tools.categories} />}
           {tab === 'risk' && <Risk trade={trade} save={save} adding={adding} clearAdding={() => setAdding(null)} />}
           {tab === 'notes' && <Notes key={trade.id} trade={trade} save={save} onImages={addCharts} uploading={uploading} />}
         </aside>
@@ -198,7 +203,7 @@ function fmtDuration(ms: number) {
   return `${Math.floor(h / 24)}d ${h % 24}h`
 }
 
-function Strategy({ trade, allSetups, allMistakes, save }: { trade: Trade; allSetups: string[]; allMistakes: string[]; save: Save }) {
+function Strategy({ trade, allSetups, allMistakes, save, strategies, categories }: { trade: Trade; allSetups: string[]; allMistakes: string[]; save: Save; strategies: StrategyDef[]; categories: TagCategory[] }) {
   const hold = trade.opened_at && trade.closed_at ? new Date(trade.closed_at).getTime() - new Date(trade.opened_at).getTime() : null
   return (
     <>
@@ -211,12 +216,67 @@ function Strategy({ trade, allSetups, allMistakes, save }: { trade: Trade; allSe
           <dt>Portfolio</dt><dd>{trade.exchange || '—'}</dd>
         </dl>
       </Section>
+      <Section title="Strategy">
+        <StrategyPicker trade={trade} strategies={strategies} save={save} />
+      </Section>
       <Section title="Setups">
         <ChipEditor kind="setup" values={trade.tags ?? []} suggestions={allSetups} onChange={(tags) => save({ tags })} />
       </Section>
       <Section title="Mistakes">
         <ChipEditor kind="mistake" values={trade.mistakes ?? []} suggestions={allMistakes} onChange={(mistakes) => save({ mistakes })} />
       </Section>
+      <Section title="Custom tags">
+        <CustomTags trade={trade} categories={categories} save={save} />
+      </Section>
+    </>
+  )
+}
+
+/** Choose the strategy this trade followed; its rules show as a checklist for review (not saved). */
+function StrategyPicker({ trade, strategies, save }: { trade: Trade; strategies: StrategyDef[]; save: Save }) {
+  const current = strategies.find((s) => s.id === trade.strategy_id)
+  if (!strategies.length) return <p className="muted" style={{ margin: 0 }}>No strategies yet. Create one in Settings → My Strategies.</p>
+  return (
+    <>
+      <select className="range-select" value={trade.strategy_id ?? ''} onChange={(e) => save({ strategy_id: e.target.value || null })} aria-label="Strategy">
+        <option value="">No strategy</option>
+        {strategies.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+      {current?.description && <p className="muted" style={{ margin: '8px 0 0', fontSize: 13 }}>{current.description}</p>}
+      {current && current.rules.length > 0 && (
+        <ul className="td-rules">
+          {current.rules.map((r, i) => <li key={`${trade.id}-${i}`}><label><input type="checkbox" />{r}</label></li>)}
+        </ul>
+      )}
+    </>
+  )
+}
+
+/** One row of toggle chips per custom tag category. */
+function CustomTags({ trade, categories, save }: { trade: Trade; categories: TagCategory[]; save: Save }) {
+  const values = trade.custom_tags ?? []
+  if (!categories.length) return <p className="muted" style={{ margin: 0 }}>No custom tags yet. Create categories in Settings → Custom Tags.</p>
+  const toggle = (v: string) => save({ custom_tags: values.includes(v) ? values.filter((x) => x !== v) : [...values, v] })
+  return (
+    <>
+      {categories.map((c) => (
+        <div key={c.id} className="ctag-group">
+          <span className="label"><span className="dot" style={{ background: c.color }} />{c.name}</span>
+          <div className="chips">
+            {c.tags.length === 0 && <span className="muted" style={{ fontSize: 12 }}>No tags in this category yet.</span>}
+            {c.tags.map((t) => {
+              const v = customTag(c.name, t)
+              const on = values.includes(v)
+              return (
+                <button key={t} type="button" className="chip toggle" aria-pressed={on} onClick={() => toggle(v)}
+                  style={on ? { borderColor: c.color, color: c.color, background: `${c.color}22` } : undefined}>
+                  {t}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </>
   )
 }
@@ -227,7 +287,9 @@ function ChipEditor({ kind, values, suggestions, onChange }: { kind: 'setup' | '
   const [text, setText] = useState('')
   const listId = `dl-${kind}`
   const add = () => {
-    const v = text.trim().toLowerCase()
+    const typed = text.trim()
+    // Reuse an existing name's casing (e.g. "Bounce"); new names stay lowercase as before.
+    const v = suggestions.find((s) => s.toLowerCase() === typed.toLowerCase()) ?? typed.toLowerCase()
     if (v && !values.includes(v)) onChange([...values, v])
     setText('')
     setOpen(false)
