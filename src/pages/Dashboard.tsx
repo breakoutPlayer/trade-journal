@@ -126,9 +126,35 @@ function Gauge({ value, label }: { value: number | null; label: string }) {
   )
 }
 
-export function Dashboard({ trades: allTrades }: { trades: Trade[] }) {
+const ALL = '__all__'
+const ACCOUNT_KEY = 'tidemark.dashboard.account'
+
+/** "Bitunix · Main" for synced trades, the exchange for manual/CSV trades, else "No account". */
+export function accountOf(t: Pick<Trade, 'exchange' | 'account'>) {
+  const ex = t.exchange?.trim()
+  if (t.account) return `${ex || 'Unknown'} · ${t.account}`
+  return ex || 'No account'
+}
+
+export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
   const [range, setRange] = useState<Range>('all')
   const [riskRange, setRiskRange] = useState<'today' | 'week'>('today')
+  const [account, setAccountState] = useState(() => localStorage.getItem(ACCOUNT_KEY) ?? ALL)
+  const setAccount = (v: string) => { setAccountState(v); localStorage.setItem(ACCOUNT_KEY, v) }
+
+  // Accounts present in the data, with trade counts. A saved choice that no longer exists falls back to "All".
+  const accounts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const t of everyTrade) m.set(accountOf(t), (m.get(accountOf(t)) ?? 0) + 1)
+    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [everyTrade])
+  const active = account !== ALL && accounts.some(([a]) => a === account) ? account : ALL
+
+  // Every widget below (including risk status) works on the selected account only.
+  const allTrades = useMemo(
+    () => (active === ALL ? everyTrade : everyTrade.filter((t) => accountOf(t) === active)),
+    [everyTrade, active],
+  )
 
   const trades = useMemo(() => {
     const from = rangeStart(range)
@@ -178,6 +204,12 @@ export function Dashboard({ trades: allTrades }: { trades: Trade[] }) {
       <div className="row dash-head">
         <h1 style={{ margin: 0 }}>Dashboard</h1>
         <span className="spacer" />
+        {accounts.length > 0 && (
+          <select className="range-select" value={active} onChange={(e) => setAccount(e.target.value)} aria-label="Account">
+            <option value={ALL}>{accounts.length > 1 ? `All accounts (${accounts.length})` : 'All accounts'}</option>
+            {accounts.map(([a]) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        )}
         <select className="range-select" value={range} onChange={(e) => setRange(e.target.value as Range)} aria-label="Date range">
           {RANGES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
         </select>

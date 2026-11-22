@@ -122,8 +122,9 @@ export function CalendarCard({ trades }: { trades: Trade[] }) {
   while (slots.length % 7) slots.push(null)
   const weeks = Array.from({ length: slots.length / 7 }, (_, i) => slots.slice(i * 7, i * 7 + 7))
   const info = (d: number) => byDay.get(dayKey(new Date(y, mo, d)))
-  const days = Array.from({ length: total }, (_, i) => info(i + 1)).filter(Boolean) as { net: number }[]
+  const days = Array.from({ length: total }, (_, i) => info(i + 1)).filter(Boolean) as { net: number; count: number }[]
   const monthNet = days.reduce((a, d) => a + d.net, 0)
+  const monthTrades = days.reduce((a, d) => a + d.count, 0)
   const today = dayKey(new Date())
 
   return (
@@ -136,7 +137,7 @@ export function CalendarCard({ trades }: { trades: Trade[] }) {
         <span className="spacer" />
         <span className="muted-strong">Monthly stats:</span>
         <span className={`stat-pill ${monthNet >= 0 ? 'pos' : 'neg'}`}>{usdShort(monthNet)}</span>
-        <span className="stat-pill days">{days.length} {plural(days.length, 'day', 'days')}</span>
+        <span className="stat-pill days">{monthTrades} {plural(monthTrades, 'trade', 'trades')}</span>
       </div>
       <div className="cal2">
         <div className="cal2-grid">
