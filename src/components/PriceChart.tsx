@@ -10,6 +10,19 @@ interface Candle { t: number; o: number; h: number; l: number; c: number }
 interface Result { source: string; interval: string; candles: Candle[] }
 
 const HOUR = 3600e3
+const MAX_SPAN = 25 * 24 * HOUR - HOUR // stay under the candles function's 25-day limit
+
+/** Heikin-Ashi candles from regular OHLC (oldest first). */
+export function heikinAshi(candles: Candle[]): Candle[] {
+  const out: Candle[] = []
+  for (const k of candles) {
+    const c = (k.o + k.h + k.l + k.c) / 4
+    const prev = out[out.length - 1]
+    const o = prev ? (prev.o + prev.c) / 2 : (k.o + k.c) / 2
+    out.push({ t: k.t, o, h: Math.max(k.h, o, c), l: Math.min(k.l, o, c), c })
+  }
+  return out
+}
 
 /** Window around the trade: some context before entry and after exit. */
 function windowFor(t: Trade): [number, number] | null {
@@ -17,9 +30,11 @@ function windowFor(t: Trade): [number, number] | null {
   const close = t.closed_at ? Date.parse(t.closed_at) : null
   const a = open ?? close, b = close ?? open
   if (a == null || b == null) return null
-  const pad = Math.max((b - a) * 0.6, 2 * HOUR)
+  const pad = Math.max((b - a) * 0.5, 8 * HOUR)
   const now = Math.floor(Date.now() / 300e3) * 300e3
-  return [Math.floor((a - pad) / 60e3) * 60e3, Math.min(Math.ceil((b + pad) / 60e3) * 60e3, now)]
+  const to = Math.min(Math.ceil((b + pad) / 60e3) * 60e3, now)
+  const from = Math.max(Math.floor((a - pad) / 60e3) * 60e3, to - MAX_SPAN)
+  return [from, to]
 }
 
 // lightweight-charts shows UTC; shift so the axis reads in the viewer's local time.
@@ -75,7 +90,7 @@ export function PriceChart({ trade, loader = loadCandles }: { trade: Trade; load
     const chart = createChart(el, {
       autoSize: true,
       layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: muted, fontSize: 11 },
-      grid: { vertLines: { color: line }, horzLines: { color: line } },
+      grid: { vertLines: { visible: false }, horzLines: { visible: false } },
       rightPriceScale: { borderColor: line },
       timeScale: { borderColor: line, timeVisible: true, secondsVisible: false },
       crosshair: { mode: CrosshairMode.Normal },
@@ -83,7 +98,7 @@ export function PriceChart({ trade, loader = loadCandles }: { trade: Trade; load
     const series = chart.addSeries(CandlestickSeries, {
       upColor: win, downColor: loss, borderVisible: false, wickUpColor: win, wickDownColor: loss,
     })
-    series.setData(data.candles.map((c) => ({ time: local(c.t), open: c.o, high: c.h, low: c.l, close: c.c })))
+    series.setData(heikinAshi(data.candles).map((c) => ({ time: local(c.t), open: c.o, high: c.h, low: c.l, close: c.c })))
 
     // Snap a timestamp to the candle that contains it.
     const snap = (ms: number) => {
@@ -116,7 +131,7 @@ export function PriceChart({ trade, loader = loadCandles }: { trade: Trade; load
     <div className="pc">
       <div className="pc-head">
         <b>{trade.symbol}USDT</b>
-        {data && <span className="muted">{data.interval} · {data.source} · times in your local zone</span>}
+        {data && <span className="muted">{data.interval} Heikin-Ashi · {data.source} · times in your local zone</span>}
         <span className="spacer" />
         <span className="pc-key"><i style={{ background: '#8b7cff' }} />Entry <i style={{ background: '#f2b13c' }} />Exit</span>
       </div>
