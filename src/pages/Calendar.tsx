@@ -66,7 +66,7 @@ export function Calendar({ trades }: { trades: Trade[] }) {
           {days.map((d) => {
             // Shade the cell more strongly the bigger the day was.
             const alpha = d.count ? 0.12 + 0.45 * (Math.abs(d.net) / maxAbs) : 0
-            const rgb = d.net >= 0 ? '63, 208, 176' : '255, 122, 107'
+            const rgb = d.net >= 0 ? '79, 185, 133' : '225, 91, 79'
             const isToday = dayKey(d.date) === today
             return (
               <div

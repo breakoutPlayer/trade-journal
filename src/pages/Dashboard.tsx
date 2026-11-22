@@ -1,14 +1,14 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import type { Trade } from '../lib/types'
 import { equityCurve, groupStats, summarize } from '../lib/stats'
-import { dayKey, netPnl, tradeTime } from '../lib/trades'
+import { dayKey, tradeTime } from '../lib/trades'
 import { fmtMoney, fmtMoneyShort, fmtPct, pnlClass } from '../lib/format'
 import {
-  currentDrawdownPct, currentStreak, dailyPnl, holdTimePnl, hourlyPnl, monthlyPnl,
+  currentDrawdownPct, currentStreak, holdTimePnl, hourlyPnl, monthlyPnl,
   volumeBySymbol, weekdayPnl, weekStart, entryPriceBuckets, changePctBuckets, volumeBuckets, yearMonths,
   type Bar,
 } from '../lib/dashboard'
-import { EquityChart } from '../components/EquityChart'
+import { CalendarCard, CumulativeCard, PerformanceSummary, ScoreCard, StatCards } from '../components/DashboardWidgets'
 import { BarChart } from '../components/BarChart'
 
 type Range = 'all' | '7d' | '30d' | 'month' | 'year'
@@ -38,97 +38,6 @@ function Widget({ title, children, className = '' }: { title: string; children: 
       <h3>{title}</h3>
       {children}
     </section>
-  )
-}
-
-function Kpi({ label, value, cls = '' }: { label: string; value: string; cls?: string }) {
-  return (
-    <div className="widget kpi">
-      <div className="label">{label}</div>
-      <div className={`value ${cls}`}>{value}</div>
-    </div>
-  )
-}
-
-/** Month grid like TraderSync's: day P&L + trade count, with a weekly total column. */
-function MonthCalendar({ trades }: { trades: Trade[] }) {
-  const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
-  const today = dayKey(new Date())
-  const byDay = useMemo(() => {
-    const m = new Map<string, { net: number; count: number; wins: number }>()
-    for (const t of trades) {
-      const k = dayKey(tradeTime(t))
-      const cur = m.get(k) ?? { net: 0, count: 0, wins: 0 }
-      const n = netPnl(t)
-      cur.net += n
-      cur.count++
-      if (n > 0) cur.wins++
-      m.set(k, cur)
-    }
-    return m
-  }, [trades])
-
-  const year = month.getFullYear()
-  const mon = month.getMonth()
-  const lead = (new Date(year, mon, 1).getDay() + 6) % 7
-  const total = new Date(year, mon + 1, 0).getDate()
-  const slots: (number | null)[] = [...Array(lead).fill(null), ...Array.from({ length: total }, (_, i) => i + 1)]
-  while (slots.length % 7) slots.push(null)
-  const weeks = Array.from({ length: slots.length / 7 }, (_, i) => slots.slice(i * 7, i * 7 + 7))
-
-  const info = (d: number) => byDay.get(dayKey(new Date(year, mon, d)))
-  const all = Array.from({ length: total }, (_, i) => info(i + 1)).filter(Boolean) as { net: number; count: number }[]
-  const monthNet = all.reduce((s, d) => s + d.net, 0)
-  const maxAbs = Math.max(1, ...all.map((d) => Math.abs(d.net)))
-
-  return (
-    <div>
-      <div className="cal-head">
-        <button onClick={() => setMonth(new Date(year, mon - 1, 1))} aria-label="Previous month">‹</button>
-        <strong>{month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</strong>
-        <span className={`pill ${monthNet >= 0 ? 'pos' : 'neg'}`}>{fmtMoney(monthNet)}</span>
-        <button onClick={() => setMonth(new Date(year, mon + 1, 1))} aria-label="Next month">›</button>
-      </div>
-      <div className="cal week-cal">
-        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Week'].map((d) => <div key={d} className="dow">{d}</div>)}
-        {weeks.map((w, wi) => {
-          const days = w.map((d) => (d ? info(d) : undefined))
-          const wNet = days.reduce((s, d) => s + (d?.net ?? 0), 0)
-          const wCount = days.reduce((s, d) => s + (d?.count ?? 0), 0)
-          return [
-            ...w.map((d, di) => {
-              if (!d) return <div key={`${wi}-${di}`} className="day empty" />
-              const i = days[di]
-              const rgb = i && i.net >= 0 ? '63, 208, 176' : '255, 122, 107'
-              return (
-                <div
-                  key={`${wi}-${di}`}
-                  className={`day ${dayKey(new Date(year, mon, d)) === today ? 'today' : ''}`}
-                  style={{ background: i ? `rgba(${rgb}, ${0.12 + 0.4 * (Math.abs(i.net) / maxAbs)})` : undefined }}
-                >
-                  <span className="d">{d}</span>
-                  {i && (
-                    <>
-                      <span className={`p ${pnlClass(i.net)}`}><span className="full">{fmtMoney(i.net)}</span><span className="short">{fmtMoneyShort(i.net)}</span></span>
-                      <span className="n">{i.count} {plural(i.count, 'trade', 'trades')}</span>
-                    </>
-                  )}
-                </div>
-              )
-            }),
-            <div key={`w${wi}`} className="day weekly">
-              <span className="d">Week {wi + 1}</span>
-              {wCount > 0 && (
-                <>
-                  <span className={`p ${pnlClass(wNet)}`}><span className="full">{fmtMoney(wNet)}</span><span className="short">{fmtMoneyShort(wNet)}</span></span>
-                  <span className="n">{wCount} {plural(wCount, 'trade', 'trades')}</span>
-                </>
-              )}
-            </div>,
-          ]
-        })}
-      </div>
-    </div>
   )
 }
 
@@ -184,7 +93,7 @@ function YearCalendar({ trades }: { trades: Trade[] }) {
   const total = months.reduce((a, m) => ({ net: a.net + m.net, count: a.count + m.count, wins: a.wins + m.wins }), { net: 0, count: 0, wins: 0 })
   const maxAbs = Math.max(1, ...months.map((m) => Math.abs(m.net)))
   const tile = (m: { net: number; count: number; wins: number }, key: string, name: string, strong = false) => (
-    <div key={key} className="ycell" style={m.count ? { background: `rgba(${m.net >= 0 ? '63, 208, 176' : '255, 122, 107'}, ${strong ? 0.16 : 0.08 + 0.22 * (Math.abs(m.net) / maxAbs)})` } : undefined}>
+    <div key={key} className="ycell" style={m.count ? { background: `rgba(${m.net >= 0 ? '79, 185, 133' : '225, 91, 79'}, ${strong ? 0.16 : 0.08 + 0.22 * (Math.abs(m.net) / maxAbs)})` } : undefined}>
       <span className="yname">{name}</span>
       {m.count ? <><b className={pnlClass(m.net)}>{fmtMoneyShort(m.net)}</b><span className="n">{m.count} · {Math.round((m.wins / m.count) * 100)}%</span></> : <span className="muted">--</span>}
     </div>
@@ -227,7 +136,6 @@ export function Dashboard({ trades: allTrades }: { trades: Trade[] }) {
   }, [allTrades, range])
 
   const s = useMemo(() => summarize(trades), [trades])
-  const curve = useMemo(() => equityCurve(trades), [trades])
   const allCurve = useMemo(() => equityCurve(allTrades), [allTrades])
 
   // Risk status always looks at "now", regardless of the date filter.
@@ -257,8 +165,6 @@ export function Dashboard({ trades: allTrades }: { trades: Trade[] }) {
     )
   }
 
-  const pf = s.profitFactor === Infinity ? '∞' : s.profitFactor.toFixed(2)
-  const avg = s.count ? s.net / s.count : 0
   const lossRate = s.count ? s.losses / s.count : 0
   const expectancy = s.winRate * s.avgWin + lossRate * s.avgLoss // avgLoss is negative
   const open = trades.filter((t) => !t.closed_at && t.exit_price == null)
@@ -280,31 +186,18 @@ export function Dashboard({ trades: allTrades }: { trades: Trade[] }) {
       {!trades.length ? (
         <div className="panel"><p>No trades in this date range.</p></div>
       ) : (
-        <div className="dash">
-          <Kpi label="Net P&L" value={fmtMoney(s.net)} cls={pnlClass(s.net)} />
-          <Kpi label="Profit factor" value={pf} cls={s.profitFactor >= 1 ? 'win' : 'loss'} />
-          <Kpi label="Avg P&L" value={fmtMoney(avg)} cls={pnlClass(avg)} />
-          <div className="widget kpi">
-            <div className="label">Win / Loss</div>
-            <div className="value">{fmtPct(s.winRate)}</div>
-            <div className="winbar" title={`${s.wins} wins, ${s.losses} losses`}>
-              <span className="pos" style={{ flex: s.wins || 0 }} />
-              <span className="neg" style={{ flex: s.losses || 0 }} />
-            </div>
-            <div className="split"><span className="win">{s.wins}</span><span className="loss">{s.losses}</span></div>
+        <>
+        <StatCards s={s} trades={trades} />
+        <div className="dash-main">
+          <CalendarCard trades={trades} />
+          <div className="dash-side">
+            <ScoreCard s={s} trades={trades} />
+            <CumulativeCard trades={trades} />
           </div>
-
-          <Widget title="Account performance" className="span-2">
-            <div className="mini-stats">
-              <div><span className="label">Avg P&L</span><b className={pnlClass(avg)}>{fmtMoney(avg)}</b></div>
-              <div><span className="label">Net P&L</span><b className={pnlClass(s.net)}>{fmtMoney(s.net)}</b></div>
-              <div><span className="label">Win %</span><b>{fmtPct(s.winRate)}</b></div>
-            </div>
-            <EquityChart points={curve} />
-          </Widget>
-          <Widget title="Daily P&L (last 30 days)" className="span-1">
-            <BarChart data={dailyPnl(trades)} />
-          </Widget>
+        </div>
+        <PerformanceSummary trades={trades} />
+        <h2 className="perf-title">More insights</h2>
+        <div className="dash">
           <Widget title="Summary" className="span-1">
             <div className="summary-grid">
               <div><div className="label">Trades</div><div className="big">{s.count}</div></div>
@@ -318,9 +211,6 @@ export function Dashboard({ trades: allTrades }: { trades: Trade[] }) {
             </div>
           </Widget>
 
-          <Widget title="Monthly calendar" className="span-3">
-            <MonthCalendar trades={trades} />
-          </Widget>
           <Widget title="Current risk status" className="span-1">
             <div className="seg">
               <button className={riskRange === 'today' ? 'active' : ''} onClick={() => setRiskRange('today')}>Today</button>
@@ -394,6 +284,7 @@ export function Dashboard({ trades: allTrades }: { trades: Trade[] }) {
           <Widget title="Hold time" className="span-1"><BarChart data={holdTimePnl(trades)} /></Widget>
           <Widget title="Monthly" className="span-1"><BarChart data={monthlyPnl(trades)} /></Widget>
         </div>
+        </>
       )}
     </>
   )

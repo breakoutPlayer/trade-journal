@@ -137,3 +137,70 @@ export function yearMonths(trades: Trade[], year: number): { net: number; count:
   }
   return out
 }
+
+// ---------- Redesigned dashboard (performance summary, score, cumulative P&L) ----------
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+export interface WeekdayStat { day: string; net: number; count: number; wins: number; winRate: number }
+
+/** Best / least performing weekday, most active weekday and best win rate (weekdays with trades only). */
+export function weekdaySummary(trades: Trade[]) {
+  const by = new Map<number, WeekdayStat>()
+  for (const t of trades) {
+    const d = tradeTime(t).getDay()
+    const cur = by.get(d) ?? { day: DAY_NAMES[d], net: 0, count: 0, wins: 0, winRate: 0 }
+    const n = netPnl(t)
+    cur.net += n
+    cur.count++
+    if (n > 0) cur.wins++
+    by.set(d, cur)
+  }
+  const list = [...by.values()].map((s) => ({ ...s, winRate: s.count ? s.wins / s.count : 0 }))
+  if (!list.length) return null
+  const pick = (cmp: (a: WeekdayStat, b: WeekdayStat) => number) => [...list].sort(cmp)[0]
+  return {
+    best: pick((a, b) => b.net - a.net),
+    least: pick((a, b) => a.net - b.net),
+    active: pick((a, b) => b.count - a.count || b.net - a.net),
+    winRate: pick((a, b) => b.winRate - a.winRate || b.count - a.count),
+  }
+}
+
+/** Cumulative net P&L at the end of each trading day, oldest first. */
+export function dailyCumulative(trades: Trade[]): { day: string; net: number; total: number }[] {
+  const by = new Map<string, number>()
+  for (const t of trades) {
+    const k = dayKey(tradeTime(t))
+    by.set(k, (by.get(k) ?? 0) + netPnl(t))
+  }
+  let total = 0
+  return [...by.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, net]) => ({ day, net, total: (total += net) }))
+}
+
+export interface ScoreAxis { label: string; value: number } // value 0..100
+
+/**
+ * A 0-100 performance score from six axes (each 0-100, then averaged):
+ * win %, profit factor, avg win/loss, recovery factor, max drawdown and consistency.
+ */
+export function performanceScore(s: {
+  count: number; winRate: number; profitFactor: number; avgWin: number; avgLoss: number; net: number; grossWin: number; maxDrawdown: number
+}, trades: Trade[]): { score: number; axes: ScoreAxis[] } | null {
+  if (s.count < 3) return null
+  const clamp = (v: number) => Math.max(0, Math.min(100, v))
+  const pf = s.profitFactor === Infinity ? 3 : s.profitFactor
+  const ratio = s.avgLoss ? s.avgWin / -s.avgLoss : s.avgWin ? 3 : 0
+  const recovery = s.maxDrawdown ? s.net / s.maxDrawdown : s.net > 0 ? 3 : 0
+  const days = dailyCumulative(trades)
+  const greenDays = days.length ? days.filter((d) => d.net > 0).length / days.length : 0
+  const axes: ScoreAxis[] = [
+    { label: 'Win %', value: clamp((s.winRate / 0.6) * 100) },
+    { label: 'Profit factor', value: clamp((pf / 2.5) * 100) },
+    { label: 'Avg win/loss', value: clamp((ratio / 2.5) * 100) },
+    { label: 'Recovery factor', value: clamp((recovery / 3) * 100) },
+    { label: 'Max drawdown', value: clamp(100 * (1 - s.maxDrawdown / Math.max(s.grossWin, 1))) },
+    { label: 'Consistency', value: clamp((greenDays / 0.6) * 100) },
+  ]
+  return { score: axes.reduce((a, x) => a + x.value, 0) / axes.length, axes }
+}
