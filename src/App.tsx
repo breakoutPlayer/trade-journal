@@ -15,6 +15,7 @@ import { Connections } from './pages/Connections'
 import { Settings } from './pages/Settings'
 import { Logo } from './components/Logo'
 import { NavIcon } from './components/NavIcon'
+import { TradeForm } from './components/TradeForm'
 
 const TABS = ['Dashboard', 'Trades', 'Journal', 'Calendar', 'Analytics', 'Import', 'Connections'] as const
 const TAB_LABELS: Record<(typeof TABS)[number], string> = { Dashboard: 'Dashboard', Trades: 'Trades', Journal: 'Journal', Calendar: 'Calendar', Analytics: 'Reports', Import: 'Import', Connections: 'Connections' }
@@ -26,6 +27,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>(TABS[0])
   const [trades, setTrades] = useState<Trade[]>([])
   const [loadError, setLoadError] = useState('')
+  const [adding, setAdding] = useState(false) // quick "Add trade" form from the sidebar
   const [openTradeId, setOpenTradeId] = useState<string | null>(null) // trade shown in the Trades detail view
 
   useEffect(() => {
@@ -83,6 +85,9 @@ export default function App() {
     <>
       <header className="topbar">
         <Logo />
+        <button className="add-trade" onClick={() => setAdding(true)} title="Add trade" aria-label="Add trade">
+          <span aria-hidden="true">+</span><span className="nav-text">Add trade</span>
+        </button>
         <nav className="tabs">
           {TABS.map((t) => (
             <button key={t} className={t === tab ? 'active' : ''} onClick={() => { setTab(t); setOpenTradeId(null) }} title={TAB_LABELS[t]} aria-label={TAB_LABELS[t]}>
@@ -113,6 +118,7 @@ export default function App() {
         {tab === 'Connections' && <Connections reload={reload} />}
         {tab === 'Settings' && <Settings trades={trades} reload={reload} />}
       </main>
+      {adding && <TradeForm onCancel={() => setAdding(false)} onDone={() => { setAdding(false); reload() }} />}
     </>
   )
 }
