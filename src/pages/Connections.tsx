@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   EXCHANGES, addConnection, deleteConnection, fetchConnections, fetchRuns, setEnabled, syncNow,
   type Connection, type ExchangeId, type SyncRun,
@@ -24,8 +24,8 @@ export function Connections({ reload }: Props) {
     Promise.all([fetchConnections(), fetchRuns()])
       .then(([c, r]) => { setConns(c); setRuns(r); setLoadError('') })
       .catch((e: Error) => setLoadError(
-        /exchange_connections|sync_runs/.test(e.message)
-          ? 'The sync tables are missing. Run the SQL in supabase/migrations (see README â†’ "Exchange auto-sync").'
+        /exchange_connections|sync_runs/.test(e.message) && /does not exist|schema cache/i.test(e.message)
+          ? 'The sync tables are missing. Run the SQL in supabase/migrations (see README → "Exchange auto-sync").'
           : e.message,
       ))
   }, [])
@@ -41,7 +41,7 @@ export function Connections({ reload }: Props) {
     try {
       await addConnection({ exchange, ...form, passphrase: ex.passphrase ? form.passphrase : undefined })
       setForm(empty) // never keep secrets in state longer than needed
-      setMessage({ kind: 'notice', text: 'Connected. Running the first sync (last 90 days)â€¦' })
+      setMessage({ kind: 'notice', text: 'Connected. Running the first sync (last 90 days)…' })
       refresh()
       const res = await syncNow()
       const total = Object.values(res?.results ?? {}).reduce((s: number, r) => s + ((r as { new_count?: number }).new_count ?? 0), 0)
@@ -73,7 +73,7 @@ export function Connections({ reload }: Props) {
   }
 
   async function remove(c: Connection) {
-    if (!confirm(`Remove "${EXCHANGES[c.exchange].label} Â· ${c.label}"? The stored API key is deleted. Trades already synced are kept.`)) return
+    if (!confirm(`Remove "${EXCHANGES[c.exchange].label} · ${c.label}"? The stored API key is deleted. Trades already synced are kept.`)) return
     setBusy(c.id)
     try { await deleteConnection(c.id) } catch (err) { setMessage({ kind: 'error', text: (err as Error).message }) }
     setBusy(null)
@@ -87,7 +87,7 @@ export function Connections({ reload }: Props) {
 
   const labelOf = (id: string) => {
     const c = conns.find((x) => x.id === id)
-    return c ? `${EXCHANGES[c.exchange].label} Â· ${c.label}` : 'Removed'
+    return c ? `${EXCHANGES[c.exchange].label} · ${c.label}` : 'Removed'
   }
 
   return (
@@ -106,7 +106,7 @@ export function Connections({ reload }: Props) {
           <h2 style={{ margin: 0 }}>Connected accounts</h2>
           <span className="spacer" />
           <button className="primary" disabled={!!busy || !conns.some((c) => c.enabled)} onClick={() => sync()}>
-            {busy === 'all' ? 'Syncingâ€¦' : 'Sync all now'}
+            {busy === 'all' ? 'Syncing…' : 'Sync all now'}
           </button>
         </div>
         {conns.length === 0 ? (
@@ -132,14 +132,14 @@ export function Connections({ reload }: Props) {
                     <td>
                       {!c.enabled ? <span className="muted">Paused</span>
                         : c.last_status === 'error' ? <span className="loss" title={c.last_error ?? ''}>Error</span>
-                        : c.last_status === 'running' ? 'Syncingâ€¦'
+                        : c.last_status === 'running' ? 'Syncing…'
                         : c.last_status === 'ok' ? <span className="win">OK</span> : <span className="muted">Not synced</span>}
                       {c.last_status === 'error' && c.last_error && <div className="muted" style={{ fontSize: 12, maxWidth: 320 }}>{c.last_error}</div>}
                     </td>
-                    <td>{c.last_synced_at ? fmtDateTime(c.last_synced_at) : 'â€”'}</td>
-                    <td className="num">{c.last_new_count ?? 'â€”'}</td>
+                    <td>{c.last_synced_at ? fmtDateTime(c.last_synced_at) : '—'}</td>
+                    <td className="num">{c.last_new_count ?? '—'}</td>
                     <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
-                      <button disabled={!!busy || !c.enabled} onClick={() => sync(c.id)}>{busy === c.id ? 'Syncingâ€¦' : 'Sync now'}</button>{' '}
+                      <button disabled={!!busy || !c.enabled} onClick={() => sync(c.id)}>{busy === c.id ? 'Syncing…' : 'Sync now'}</button>{' '}
                       <button disabled={!!busy} onClick={() => toggle(c)}>{c.enabled ? 'Pause' : 'Resume'}</button>{' '}
                       <button disabled={!!busy} onClick={() => remove(c)}>Remove</button>
                     </td>
@@ -186,7 +186,7 @@ export function Connections({ reload }: Props) {
           )}
         </div>
         <p className="muted">{ex.guide}</p>
-        <button className="primary" type="submit" disabled={!canSave || !!busy}>{busy === 'add' ? 'Checking keyâ€¦' : 'Connect'}</button>
+        <button className="primary" type="submit" disabled={!canSave || !!busy}>{busy === 'add' ? 'Checking key…' : 'Connect'}</button>
       </form>
 
       {runs.length > 0 && (
