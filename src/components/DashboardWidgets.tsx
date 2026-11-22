@@ -138,6 +138,7 @@ export function CalendarCard({ trades }: { trades: Trade[] }) {
         <span className="muted-strong">Monthly stats:</span>
         <span className={`stat-pill ${monthNet >= 0 ? 'pos' : 'neg'}`}>{usdShort(monthNet)}</span>
         <span className="stat-pill days">{monthTrades} {plural(monthTrades, 'trade', 'trades')}</span>
+        <span className="stat-pill days">{days.length} {plural(days.length, 'day', 'days')}</span>
       </div>
       <div className="cal2">
         <div className="cal2-grid">
