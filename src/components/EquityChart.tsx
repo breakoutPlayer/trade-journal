@@ -18,7 +18,7 @@ export function EquityChart({ points }: { points: CurvePoint[] }) {
     return () => ro.disconnect()
   }, [box])
 
-  if (points.length < 2) return <p>Add at least two trades to see your equity curve.</p>
+  if (points.length < 1) return <p>Add a trade to see your equity curve.</p>
 
   // Start the line at zero so the first trade's result is visible.
   const values = [0, ...points.map((p) => p.equity)]

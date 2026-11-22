@@ -11,8 +11,10 @@ import { Dashboard } from './pages/Dashboard'
 import { Calendar } from './pages/Calendar'
 import { Analytics } from './pages/Analytics'
 import { Logo } from './components/Logo'
+import { NavIcon } from './components/NavIcon'
 
 const TABS = ['Dashboard', 'Trades', 'Calendar', 'Analytics', 'Import'] as const
+const TAB_LABELS: Record<(typeof TABS)[number], string> = { Dashboard: 'Dashboard', Trades: 'Trades', Calendar: 'Calendar', Analytics: 'Reports', Import: 'Import' }
 type Tab = (typeof TABS)[number]
 
 export default function App() {
@@ -79,17 +81,18 @@ export default function App() {
         <Logo />
         <nav className="tabs">
           {TABS.map((t) => (
-            <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)}>
-              {t}
+            <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)} title={TAB_LABELS[t]} aria-label={TAB_LABELS[t]}>
+              <NavIcon name={t} />
+              <span className="nav-text">{TAB_LABELS[t]}</span>
             </button>
           ))}
         </nav>
         <div className="account">
           <span className="who">{session.user.email}</span>
           <button onClick={() => downloadBackup(trades)} disabled={!trades.length} title="Download all trades as JSON">
-            Backup
+            <span className="nav-text">Backup</span><NavIcon name="Import" />
           </button>
-          <button onClick={() => supabase.auth.signOut()}>Sign out</button>
+          <button onClick={() => supabase.auth.signOut()} title="Sign out" aria-label="Sign out"><span className="nav-text">Sign out</span><span className="avatar" aria-hidden="true">{(session.user.email ?? '?')[0].toUpperCase()}</span></button>
         </div>
       </header>
       <main>

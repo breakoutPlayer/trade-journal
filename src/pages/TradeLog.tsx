@@ -1,154 +1,208 @@
 import { useMemo, useState } from 'react'
 import type { Trade } from '../lib/types'
-import { deleteTrade, netPnl } from '../lib/trades'
-import { fmtDateTime, fmtMoney, fmtNum, pnlClass } from '../lib/format'
+import { deleteTrade, netPnl, tradeReturn, tradeStatus } from '../lib/trades'
+import { fmtMoney, fmtNum, fmtPct, pnlClass } from '../lib/format'
+import { summarize } from '../lib/stats'
 import { TradeForm } from '../components/TradeForm'
-import { ChartViewer } from '../components/Charts'
 import { removeCharts } from '../lib/charts'
+import { TradeDetail } from './TradeDetail'
 
 interface Props {
   trades: Trade[]
   reload: () => void
 }
 
+const openTime = (t: Trade) => new Date(t.opened_at ?? t.closed_at ?? t.created_at).getTime()
+const fmtDay = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' })
+
 export function TradeLog({ trades, reload }: Props) {
   const [editing, setEditing] = useState<Trade | 'new' | null>(null)
-  const [viewing, setViewing] = useState<Trade | null>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [tag, setTag] = useState('')
+  const [setup, setSetup] = useState('')
+  const [mistake, setMistake] = useState('')
+  const [side, setSide] = useState('')
+  const [asc, setAsc] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
-  const allTags = useMemo(() => [...new Set(trades.flatMap((t) => t.tags ?? []))].sort(), [trades])
+  const allSetups = useMemo(() => [...new Set(trades.flatMap((t) => t.tags ?? []))].sort(), [trades])
+  const allMistakes = useMemo(() => [...new Set(trades.flatMap((t) => t.mistakes ?? []))].sort(), [trades])
 
   const q = search.trim().toLowerCase()
-  const shown = trades.filter((t) => {
-    const hay = `${t.symbol} ${t.notes ?? ''} ${t.exchange ?? ''}`.toLowerCase()
-    return (!q || hay.includes(q)) && (!tag || (t.tags ?? []).includes(tag))
-  })
+  const shown = useMemo(() => {
+    const list = trades.filter((t) => {
+      const hay = `${t.symbol} ${t.notes ?? ''} ${t.exchange ?? ''}`.toLowerCase()
+      return (
+        (!q || hay.includes(q)) &&
+        (!setup || (t.tags ?? []).includes(setup)) &&
+        (!mistake || (t.mistakes ?? []).includes(mistake)) &&
+        (!side || t.side === side)
+      )
+    })
+    return list.sort((a, b) => (asc ? openTime(a) - openTime(b) : openTime(b) - openTime(a)))
+  }, [trades, q, setup, mistake, side, asc])
 
-  async function remove(t: Trade) {
-    if (!confirm(`Delete this ${t.symbol} trade? This cannot be undone.`)) return
+  const s = useMemo(() => summarize(shown), [shown])
+  const filtered = Boolean(q || setup || mistake || side)
+  const clearAll = () => { setSearch(''); setSetup(''); setMistake(''); setSide('') }
+
+  const opened = openId ? trades.find((t) => t.id === openId) : undefined
+  if (opened) {
+    const i = shown.findIndex((t) => t.id === opened.id)
+    return (
+      <>
+        <TradeDetail
+          trade={opened}
+          allSetups={allSetups}
+          allMistakes={allMistakes}
+          reload={reload}
+          onBack={() => setOpenId(null)}
+          onEdit={() => setEditing(opened)}
+          onDeleted={() => { setOpenId(null); reload() }}
+          prev={i > 0 ? () => setOpenId(shown[i - 1].id) : undefined}
+          next={i >= 0 && i < shown.length - 1 ? () => setOpenId(shown[i + 1].id) : undefined}
+        />
+        {editing && editing !== 'new' && (
+          <TradeForm trade={editing} onCancel={() => setEditing(null)} onDone={() => { setEditing(null); reload() }} />
+        )}
+      </>
+    )
+  }
+
+  const toggle = (id: string) => {
+    const next = new Set(selected)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelected(next)
+  }
+  const visibleSelected = shown.filter((t) => selected.has(t.id))
+  const allChecked = shown.length > 0 && visibleSelected.length === shown.length
+
+  async function removeSelected() {
+    const list = visibleSelected
+    if (!list.length || !confirm(`Delete ${list.length} trade${list.length > 1 ? 's' : ''}? This cannot be undone.`)) return
     try {
-      await deleteTrade(t.id)
-      removeCharts(t.charts ?? []).catch(() => {})
+      for (const t of list) {
+        await deleteTrade(t.id)
+        removeCharts(t.charts ?? []).catch(() => {})
+      }
+      setSelected(new Set())
       reload()
     } catch (err) {
       alert((err as Error).message)
     }
   }
 
+  const pf = s.profitFactor === Infinity ? '∞' : s.profitFactor ? s.profitFactor.toFixed(2) : '—'
+  const avg = s.count ? s.net / s.count : 0
+
   return (
-    <>
-      <div className="row" style={{ marginBottom: 14 }}>
-        <h1 style={{ margin: 0 }}>Trade log</h1>
-        <span className="spacer" />
-        <button className="primary" onClick={() => setEditing('new')}>+ New trade</button>
-      </div>
-
-      <div className="panel">
-        <div className="row" style={{ marginBottom: 12 }}>
-          <input
-            className="grow"
-            style={{ maxWidth: 280 }}
-            placeholder="Search symbol, notes, exchange…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <select className="grow" style={{ maxWidth: 200 }} value={tag} onChange={(e) => setTag(e.target.value)}>
-            <option value="">All tags</option>
-            {allTags.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
+    <div className="tl">
+      <div className="tl-filters">
+        <button className="icon-btn" title="New trade" aria-label="New trade" onClick={() => setEditing('new')}>+</button>
+        <input className="tl-search" placeholder="Search symbol, notes, portfolio…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select className="range-select" value={setup} onChange={(e) => setSetup(e.target.value)} aria-label="Setup">
+          <option value="">All setups</option>
+          {allSetups.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        {allMistakes.length > 0 && (
+          <select className="range-select" value={mistake} onChange={(e) => setMistake(e.target.value)} aria-label="Mistake">
+            <option value="">All mistakes</option>
+            {allMistakes.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
-          <span className="muted">
-            {shown.length} of {trades.length} trades
-          </span>
-        </div>
-
-        {shown.length === 0 ? (
-          <p>No trades here yet. Add one manually or import a CSV.</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="cards">
-              <thead>
-                <tr>
-                  <th>Closed</th>
-                  <th>Symbol</th>
-                  <th>Side</th>
-                  <th className="num">Size</th>
-                  <th className="num">Entry</th>
-                  <th className="num">Exit</th>
-                  <th className="num">Net P&amp;L</th>
-                  <th>Tags</th>
-                  <th>Notes</th>
-                  <th>Charts</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((t) => {
-                  const net = netPnl(t)
-                  return (
-                    <tr key={t.id}>
-                      <td className="c-date">{fmtDateTime(t.closed_at ?? t.opened_at)}</td>
-                      <td className="c-symbol">
-                        <strong>{t.symbol}</strong>
-                        {t.exchange && <div className="muted">{t.exchange}</div>}
-                      </td>
-                      <td className="c-side">
-                        <span className={`side ${t.side === 'short' ? 'loss' : 'win'}`}>{t.side ?? '—'}</span>
-                      </td>
-                      <td className="num" data-label="Size">{fmtNum(t.size)}</td>
-                      <td className="num" data-label="Entry">{fmtNum(t.entry_price)}</td>
-                      <td className="num" data-label="Exit">{fmtNum(t.exit_price)}</td>
-                      <td className={`num c-pnl ${pnlClass(net)}`}>{fmtMoney(net)}</td>
-                      <td className={`c-tags ${(t.tags ?? []).length ? '' : 'c-empty'}`}>
-                        {(t.tags ?? []).map((g) => (
-                          <span key={g} className="tag">{g}</span>
-                        ))}
-                      </td>
-                      <td className={`notes ${t.notes ? '' : 'c-empty'}`}>{t.notes}</td>
-                      <td className="c-charts">
-                        {(t.charts ?? []).length > 0 ? (
-                          <button className="link" onClick={() => setViewing(t)}>
-                            View ({t.charts!.length})
-                          </button>
-                        ) : (
-                          <span className="muted">—</span>
-                        )}
-                      </td>
-                      <td className="c-actions">
-                        <div className="row" style={{ flexWrap: 'nowrap' }}>
-                          <button onClick={() => setEditing(t)}>Edit</button>
-                          <button className="danger" onClick={() => remove(t)}>Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
         )}
+        <select className="range-select" value={side} onChange={(e) => setSide(e.target.value)} aria-label="Side">
+          <option value="">Long &amp; short</option>
+          <option value="long">Long</option>
+          <option value="short">Short</option>
+        </select>
+        {filtered && <button className="chip-btn" onClick={clearAll}>Clear all ×</button>}
       </div>
 
-      {viewing && (
-        <ChartViewer
-          title={`${viewing.symbol} · ${fmtDateTime(viewing.closed_at ?? viewing.opened_at)}`}
-          paths={viewing.charts ?? []}
-          onClose={() => setViewing(null)}
-        />
-      )}
+      <div className="tl-kpis">
+        <div className="tl-kpi"><span className="label">Net P&amp;L $</span><b className={pnlClass(s.net)}>{fmtMoney(s.net, false)}</b></div>
+        <div className="tl-kpi"><span className="label">Profit factor</span><b>{pf}</b></div>
+        <div className="tl-kpi"><span className="label">Avg P&amp;L $</span><b className={pnlClass(avg)}>{fmtMoney(avg, false)}</b></div>
+        <div className="tl-kpi tl-wl">
+          <div className="split"><span className="label">Win</span><span className="label">Loss</span></div>
+          <div className="winbar">
+            <span className="pos" style={{ flex: s.wins || 0 }} />
+            <span className="neg" style={{ flex: s.losses || 0 }} />
+          </div>
+          <div className="split">
+            <b className="win">{s.count ? fmtPct(s.wins / s.count) : '—'} <small>{s.wins}</small></b>
+            <b className="loss"><small>{s.losses}</small> {s.count ? fmtPct(s.losses / s.count) : '—'}</b>
+          </div>
+        </div>
+      </div>
+
+      <div className="widget tl-table-wrap">
+        {shown.length === 0 ? (
+          <p className="widget-empty">{trades.length ? 'No trades match these filters.' : 'No trades yet. Add one with + or import a CSV.'}</p>
+        ) : (
+          <table className="tl-table">
+            <thead>
+              <tr>
+                <th className="c-check"><input type="checkbox" aria-label="Select all" checked={allChecked} onChange={() => setSelected(allChecked ? new Set() : new Set(shown.map((t) => t.id)))} /></th>
+                <th>Status</th>
+                <th><button className="th-sort" onClick={() => setAsc(!asc)}>Open date {asc ? '↑' : '↓'}</button></th>
+                <th>Symbol</th>
+                <th className="num">Entry</th>
+                <th className="num">Exit</th>
+                <th className="num">Size</th>
+                <th className="num">Net P&amp;L $</th>
+                <th className="num">Return %</th>
+                <th>Side</th>
+                <th>Setups</th>
+                <th>Mistakes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((t) => {
+                const n = netPnl(t)
+                const r = tradeReturn(t)
+                const st = tradeStatus(t)
+                return (
+                  <tr key={t.id} onClick={() => setOpenId(t.id)} className={selected.has(t.id) ? 'sel' : ''}>
+                    <td className="c-check" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" aria-label={`Select ${t.symbol}`} checked={selected.has(t.id)} onChange={() => toggle(t.id)} />
+                    </td>
+                    <td className={`c-status st-${st.toLowerCase()}`}>{st}</td>
+                    <td className="c-date">{fmtDay(openTime(t))}</td>
+                    <td className="c-symbol"><span className="sym">{t.symbol}</span></td>
+                    <td className="num" data-label="Entry">{fmtNum(t.entry_price)}</td>
+                    <td className="num" data-label="Exit">{fmtNum(t.exit_price)}</td>
+                    <td className="num" data-label="Size">{fmtNum(t.size)}</td>
+                    <td className={`num c-pnl ${pnlClass(n)}`}>{st === 'OPEN' ? '—' : fmtMoney(n, false)}</td>
+                    <td className={`num c-ret ${pnlClass(n)}`}>{r == null || st === 'OPEN' ? '—' : `${(r * 100).toFixed(2)}%`}</td>
+                    <td className="c-side"><span className={`side-badge ${t.side === 'short' ? 'short' : 'long'}`}>{t.side ? t.side[0].toUpperCase() : '–'}</span></td>
+                    <td className={`c-setups ${(t.tags ?? []).length ? '' : 'c-empty'}`}>{(t.tags ?? []).map((g) => <span key={g} className="chip setup">{g}</span>)}</td>
+                    <td className={`c-mistakes ${(t.mistakes ?? []).length ? '' : 'c-empty'}`}>{(t.mistakes ?? []).map((g) => <span key={g} className="chip mistake">{g}</span>)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+        <div className="tl-foot">
+          <span>Trades: {shown.length}/{trades.length}</span>
+          {visibleSelected.length > 0 && (
+            <>
+              <span className="spacer" />
+              <span>{visibleSelected.length} selected</span>
+              <button className="danger" onClick={removeSelected}>Delete selected</button>
+            </>
+          )}
+        </div>
+      </div>
 
       {editing && (
         <TradeForm
           trade={editing === 'new' ? undefined : editing}
           onCancel={() => setEditing(null)}
-          onDone={() => {
-            setEditing(null)
-            reload()
-          }}
+          onDone={() => { setEditing(null); reload() }}
         />
       )}
-    </>
+    </div>
   )
 }

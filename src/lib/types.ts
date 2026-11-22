@@ -15,6 +15,10 @@ export interface Trade {
   notes: string | null
   tags: string[] | null
   charts: string[] | null // Supabase Storage paths of chart screenshots
+  // Added later (see README). Optional so the app still loads before the columns exist.
+  mistakes?: string[] | null
+  targets?: number[] | null // profit target prices
+  stops?: number[] | null // stop-loss prices
   created_at: string
 }
 

@@ -41,6 +41,18 @@ create policy "own charts: delete" on storage.objects for delete to authenticate
 
 Images are limited to 10 MB each. The JSON backup includes chart paths but not the image files themselves.
 
+## Trade details
+
+Click a trade on the Trades page to open it: Overview, Strategy, Risk and Notes tabs on the left and its chart screenshots on the right (paste a screenshot anywhere on that page to attach it). Setups use the existing `tags` column. Mistakes, profit targets and stop losses need three more columns. Run this once in the SQL Editor:
+
+```sql
+alter table trades add column if not exists mistakes text[] not null default '{}';
+alter table trades add column if not exists targets numeric[] not null default '{}';
+alter table trades add column if not exists stops numeric[] not null default '{}';
+```
+
+Note templates ("Save as new template" in the Notes tab) are kept in your browser, not in Supabase.
+
 ## How P&L is stored
 
 - `pnl` = gross realized P&L, `fees` = fees paid. Every stat uses **net = pnl − fees**.

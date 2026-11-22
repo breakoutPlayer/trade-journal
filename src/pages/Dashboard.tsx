@@ -1,23 +1,254 @@
-import { useMemo } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { Trade } from '../lib/types'
-import { equityCurve, summarize } from '../lib/stats'
-import { fmtMoney, fmtPct, pnlClass } from '../lib/format'
+import { equityCurve, groupStats, summarize } from '../lib/stats'
+import { dayKey, netPnl, tradeTime } from '../lib/trades'
+import { fmtMoney, fmtMoneyShort, fmtPct, pnlClass } from '../lib/format'
+import {
+  currentDrawdownPct, currentStreak, dailyPnl, holdTimePnl, hourlyPnl, monthlyPnl,
+  volumeBySymbol, weekdayPnl, weekStart, entryPriceBuckets, changePctBuckets, volumeBuckets, yearMonths,
+  type Bar,
+} from '../lib/dashboard'
 import { EquityChart } from '../components/EquityChart'
+import { BarChart } from '../components/BarChart'
 
-function Stat({ label, value, cls = '' }: { label: string; value: string; cls?: string }) {
+type Range = 'all' | '7d' | '30d' | 'month' | 'year'
+const RANGES: { id: Range; label: string }[] = [
+  { id: 'all', label: 'All time' },
+  { id: '7d', label: 'Last 7 days' },
+  { id: '30d', label: 'Last 30 days' },
+  { id: 'month', label: 'This month' },
+  { id: 'year', label: 'This year' },
+]
+
+function rangeStart(r: Range): Date | null {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (r === '7d') { today.setDate(today.getDate() - 6); return today }
+  if (r === '30d') { today.setDate(today.getDate() - 29); return today }
+  if (r === 'month') return new Date(now.getFullYear(), now.getMonth(), 1)
+  if (r === 'year') return new Date(now.getFullYear(), 0, 1)
+  return null
+}
+
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many)
+
+function Widget({ title, children, className = '' }: { title: string; children: ReactNode; className?: string }) {
   return (
-    <div className="stat">
+    <section className={`widget ${className}`}>
+      <h3>{title}</h3>
+      {children}
+    </section>
+  )
+}
+
+function Kpi({ label, value, cls = '' }: { label: string; value: string; cls?: string }) {
+  return (
+    <div className="widget kpi">
       <div className="label">{label}</div>
       <div className={`value ${cls}`}>{value}</div>
     </div>
   )
 }
 
-export function Dashboard({ trades }: { trades: Trade[] }) {
+/** Month grid like TraderSync's: day P&L + trade count, with a weekly total column. */
+function MonthCalendar({ trades }: { trades: Trade[] }) {
+  const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+  const today = dayKey(new Date())
+  const byDay = useMemo(() => {
+    const m = new Map<string, { net: number; count: number; wins: number }>()
+    for (const t of trades) {
+      const k = dayKey(tradeTime(t))
+      const cur = m.get(k) ?? { net: 0, count: 0, wins: 0 }
+      const n = netPnl(t)
+      cur.net += n
+      cur.count++
+      if (n > 0) cur.wins++
+      m.set(k, cur)
+    }
+    return m
+  }, [trades])
+
+  const year = month.getFullYear()
+  const mon = month.getMonth()
+  const lead = (new Date(year, mon, 1).getDay() + 6) % 7
+  const total = new Date(year, mon + 1, 0).getDate()
+  const slots: (number | null)[] = [...Array(lead).fill(null), ...Array.from({ length: total }, (_, i) => i + 1)]
+  while (slots.length % 7) slots.push(null)
+  const weeks = Array.from({ length: slots.length / 7 }, (_, i) => slots.slice(i * 7, i * 7 + 7))
+
+  const info = (d: number) => byDay.get(dayKey(new Date(year, mon, d)))
+  const all = Array.from({ length: total }, (_, i) => info(i + 1)).filter(Boolean) as { net: number; count: number }[]
+  const monthNet = all.reduce((s, d) => s + d.net, 0)
+  const maxAbs = Math.max(1, ...all.map((d) => Math.abs(d.net)))
+
+  return (
+    <div>
+      <div className="cal-head">
+        <button onClick={() => setMonth(new Date(year, mon - 1, 1))} aria-label="Previous month">‹</button>
+        <strong>{month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</strong>
+        <span className={`pill ${monthNet >= 0 ? 'pos' : 'neg'}`}>{fmtMoney(monthNet)}</span>
+        <button onClick={() => setMonth(new Date(year, mon + 1, 1))} aria-label="Next month">›</button>
+      </div>
+      <div className="cal week-cal">
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Week'].map((d) => <div key={d} className="dow">{d}</div>)}
+        {weeks.map((w, wi) => {
+          const days = w.map((d) => (d ? info(d) : undefined))
+          const wNet = days.reduce((s, d) => s + (d?.net ?? 0), 0)
+          const wCount = days.reduce((s, d) => s + (d?.count ?? 0), 0)
+          return [
+            ...w.map((d, di) => {
+              if (!d) return <div key={`${wi}-${di}`} className="day empty" />
+              const i = days[di]
+              const rgb = i && i.net >= 0 ? '63, 208, 176' : '255, 122, 107'
+              return (
+                <div
+                  key={`${wi}-${di}`}
+                  className={`day ${dayKey(new Date(year, mon, d)) === today ? 'today' : ''}`}
+                  style={{ background: i ? `rgba(${rgb}, ${0.12 + 0.4 * (Math.abs(i.net) / maxAbs)})` : undefined }}
+                >
+                  <span className="d">{d}</span>
+                  {i && (
+                    <>
+                      <span className={`p ${pnlClass(i.net)}`}><span className="full">{fmtMoney(i.net)}</span><span className="short">{fmtMoneyShort(i.net)}</span></span>
+                      <span className="n">{i.count} {plural(i.count, 'trade', 'trades')}</span>
+                    </>
+                  )}
+                </div>
+              )
+            }),
+            <div key={`w${wi}`} className="day weekly">
+              <span className="d">Week {wi + 1}</span>
+              {wCount > 0 && (
+                <>
+                  <span className={`p ${pnlClass(wNet)}`}><span className="full">{fmtMoney(wNet)}</span><span className="short">{fmtMoneyShort(wNet)}</span></span>
+                  <span className="n">{wCount} {plural(wCount, 'trade', 'trades')}</span>
+                </>
+              )}
+            </div>,
+          ]
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** Horizontal distribution rows: label, P&L, and a bar sized by magnitude. */
+function DistList({ data }: { data: Bar[] }) {
+  if (!data.length) return <div className="widget-empty">No data</div>
+  const max = Math.max(1, ...data.map((d) => Math.abs(d.value)))
+  return (
+    <div className="dist">
+      {data.map((d) => (
+        <div key={d.label} className="dist-row" title={`${d.count} trade(s)`}>
+          <div className="dist-top"><span>{d.label}</span><b className={pnlClass(d.value)}>{fmtMoney(d.value, false)}</b></div>
+          <div className="dist-track"><span className={d.value >= 0 ? 'pos' : 'neg'} style={{ width: `${Math.max(2, (Math.abs(d.value) / max) * 100)}%` }} /></div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Long vs short head-to-head, like TraderSync's Compare widget. */
+function Compare({ trades }: { trades: Trade[] }) {
+  const longs = summarize(trades.filter((t) => t.side === 'long'))
+  const shorts = summarize(trades.filter((t) => t.side === 'short'))
+  const n = longs.count + shorts.count || 1
+  const lp = (longs.count / n) * 100
+  const pf = (x: number) => (x === Infinity ? '∞' : x ? x.toFixed(2) : '—')
+  type S = typeof longs
+  const rows: [string, (x: S) => string, (x: S) => string][] = [
+    ['P&L (net)', (x) => fmtMoney(x.net, false), (x) => pnlClass(x.net)],
+    ['Profit factor', (x) => pf(x.profitFactor), () => ''],
+    ['Win %', (x) => (x.count ? fmtPct(x.winRate) : '—'), () => ''],
+    ['Avg P&L', (x) => fmtMoney(x.count ? x.net / x.count : 0, false), (x) => pnlClass(x.net)],
+    ['Avg win', (x) => fmtMoney(x.avgWin, false), () => ''],
+  ]
+  return (
+    <div>
+      <div className="cmp-head"><span><b className="loss">{(100 - lp).toFixed(0)}%</b> SHORT</span><span>LONG <b className="win">{lp.toFixed(0)}%</b></span></div>
+      <div className="cmp-bar"><span className="neg" style={{ flex: shorts.count }} /><span className="pos" style={{ flex: longs.count }} /></div>
+      {rows.map(([label, f, c]) => (
+        <div key={label} className="cmp-row">
+          <div><div className="label">{label}</div><div className={c(shorts)}>{f(shorts)}</div></div>
+          <div className="r"><div className="label">{label}</div><div className={c(longs)}>{f(longs)}</div></div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Twelve month tiles for one year plus a total. */
+function YearCalendar({ trades }: { trades: Trade[] }) {
+  const [year, setYear] = useState(new Date().getFullYear())
+  const months = useMemo(() => yearMonths(trades, year), [trades, year])
+  const total = months.reduce((a, m) => ({ net: a.net + m.net, count: a.count + m.count, wins: a.wins + m.wins }), { net: 0, count: 0, wins: 0 })
+  const maxAbs = Math.max(1, ...months.map((m) => Math.abs(m.net)))
+  const tile = (m: { net: number; count: number; wins: number }, key: string, name: string, strong = false) => (
+    <div key={key} className="ycell" style={m.count ? { background: `rgba(${m.net >= 0 ? '63, 208, 176' : '255, 122, 107'}, ${strong ? 0.16 : 0.08 + 0.22 * (Math.abs(m.net) / maxAbs)})` } : undefined}>
+      <span className="yname">{name}</span>
+      {m.count ? <><b className={pnlClass(m.net)}>{fmtMoneyShort(m.net)}</b><span className="n">{m.count} · {Math.round((m.wins / m.count) * 100)}%</span></> : <span className="muted">--</span>}
+    </div>
+  )
+  return (
+    <div className="ycal">
+      <div className="ycell yyear">
+        <button aria-label="Previous year" onClick={() => setYear(year - 1)}>‹</button>
+        <b>{year}</b>
+        <button aria-label="Next year" onClick={() => setYear(year + 1)}>›</button>
+      </div>
+      {months.map((m, i) => tile(m, String(i), new Date(2000, i, 1).toLocaleDateString(undefined, { month: 'short' }).toUpperCase()))}
+      {tile(total, 'total', 'TOTAL', true)}
+    </div>
+  )
+}
+
+/** Semicircle gauge, 0-100. */
+function Gauge({ value, label }: { value: number | null; label: string }) {
+  const c = Math.PI * 52
+  const v = value == null ? 0 : Math.max(0, Math.min(100, value))
+  return (
+    <div className="gauge">
+      <svg viewBox="0 0 130 80" aria-hidden>
+        <path d="M13 70 A52 52 0 0 1 117 70" className="g-track" />
+        {v > 0 && <path d="M13 70 A52 52 0 0 1 117 70" className="g-fill" style={{ strokeDasharray: `${(v / 100) * c} ${c}` }} />}
+      </svg>
+      <div className="g-text"><span>{label}</span><b>{value == null ? 'N/A' : Math.round(v)}</b></div>
+    </div>
+  )
+}
+
+export function Dashboard({ trades: allTrades }: { trades: Trade[] }) {
+  const [range, setRange] = useState<Range>('all')
+  const [riskRange, setRiskRange] = useState<'today' | 'week'>('today')
+
+  const trades = useMemo(() => {
+    const from = rangeStart(range)
+    return from ? allTrades.filter((t) => tradeTime(t) >= from) : allTrades
+  }, [allTrades, range])
+
   const s = useMemo(() => summarize(trades), [trades])
   const curve = useMemo(() => equityCurve(trades), [trades])
+  const allCurve = useMemo(() => equityCurve(allTrades), [allTrades])
 
-  if (!trades.length) {
+  // Risk status always looks at "now", regardless of the date filter.
+  const risk = useMemo(() => {
+    const now = new Date()
+    const from = riskRange === 'today' ? new Date(now.getFullYear(), now.getMonth(), now.getDate()) : weekStart(now)
+    const todayKey = dayKey(now)
+    return {
+      sum: summarize(allTrades.filter((t) => tradeTime(t) >= from)),
+      tradesToday: allTrades.filter((t) => dayKey(tradeTime(t)) === todayKey).length,
+      streak: currentStreak(allTrades),
+      dd: currentDrawdownPct(allCurve),
+    }
+  }, [allTrades, riskRange, allCurve])
+
+  const strategies = useMemo(
+    () => groupStats(trades, (t) => t.tags ?? []).sort((a, b) => b.count - a.count).slice(0, 4),
+    [trades],
+  )
+
+  if (!allTrades.length) {
     return (
       <>
         <h1>Dashboard</h1>
@@ -27,28 +258,143 @@ export function Dashboard({ trades }: { trades: Trade[] }) {
   }
 
   const pf = s.profitFactor === Infinity ? '∞' : s.profitFactor.toFixed(2)
+  const avg = s.count ? s.net / s.count : 0
+  const lossRate = s.count ? s.losses / s.count : 0
+  const expectancy = s.winRate * s.avgWin + lossRate * s.avgLoss // avgLoss is negative
+  const open = trades.filter((t) => !t.closed_at && t.exit_price == null)
+  const safety = s.count >= 5
+    ? 100 * (0.4 * Math.min(1, s.winRate / 0.52) + 0.3 * Math.min(1, (s.profitFactor === Infinity ? 2 : s.profitFactor) / 1.5) + 0.3 * Math.min(1, s.avgLoss ? s.avgWin / -s.avgLoss : 1))
+    : null
+  const streakWord = risk.streak.kind === 'win' ? plural(risk.streak.length, 'win', 'wins') : risk.streak.kind === 'loss' ? plural(risk.streak.length, 'loss', 'losses') : ''
+
   return (
     <>
-      <h1>Dashboard</h1>
-      <div className="stats">
-        <Stat label="Net P&L" value={fmtMoney(s.net)} cls={pnlClass(s.net)} />
-        <Stat label="Win rate" value={fmtPct(s.winRate)} />
-        <Stat label="Profit factor" value={pf} cls={s.profitFactor >= 1 ? 'win' : 'loss'} />
-        <Stat label="Trades" value={`${s.count}`} />
-        <Stat label="Avg win" value={fmtMoney(s.avgWin)} cls="win" />
-        <Stat label="Avg loss" value={fmtMoney(s.avgLoss)} cls="loss" />
-        <Stat label="Max drawdown" value={fmtMoney(-s.maxDrawdown)} cls={s.maxDrawdown ? 'loss' : ''} />
-        <Stat label="Fees paid" value={fmtMoney(s.fees, false)} />
+      <div className="row dash-head">
+        <h1 style={{ margin: 0 }}>Dashboard</h1>
+        <span className="spacer" />
+        <select className="range-select" value={range} onChange={(e) => setRange(e.target.value as Range)} aria-label="Date range">
+          {RANGES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+        </select>
       </div>
-      <div className="panel">
-        <h3>Equity curve</h3>
-        <EquityChart points={curve} />
-      </div>
-      <div className="stats">
-        <Stat label="Best trade" value={fmtMoney(s.best)} cls={pnlClass(s.best)} />
-        <Stat label="Worst trade" value={fmtMoney(s.worst)} cls={pnlClass(s.worst)} />
-        <Stat label="Wins / losses" value={`${s.wins} / ${s.losses}`} />
-      </div>
+
+      {!trades.length ? (
+        <div className="panel"><p>No trades in this date range.</p></div>
+      ) : (
+        <div className="dash">
+          <Kpi label="Net P&L" value={fmtMoney(s.net)} cls={pnlClass(s.net)} />
+          <Kpi label="Profit factor" value={pf} cls={s.profitFactor >= 1 ? 'win' : 'loss'} />
+          <Kpi label="Avg P&L" value={fmtMoney(avg)} cls={pnlClass(avg)} />
+          <div className="widget kpi">
+            <div className="label">Win / Loss</div>
+            <div className="value">{fmtPct(s.winRate)}</div>
+            <div className="winbar" title={`${s.wins} wins, ${s.losses} losses`}>
+              <span className="pos" style={{ flex: s.wins || 0 }} />
+              <span className="neg" style={{ flex: s.losses || 0 }} />
+            </div>
+            <div className="split"><span className="win">{s.wins}</span><span className="loss">{s.losses}</span></div>
+          </div>
+
+          <Widget title="Account performance" className="span-2">
+            <div className="mini-stats">
+              <div><span className="label">Avg P&L</span><b className={pnlClass(avg)}>{fmtMoney(avg)}</b></div>
+              <div><span className="label">Net P&L</span><b className={pnlClass(s.net)}>{fmtMoney(s.net)}</b></div>
+              <div><span className="label">Win %</span><b>{fmtPct(s.winRate)}</b></div>
+            </div>
+            <EquityChart points={curve} />
+          </Widget>
+          <Widget title="Daily P&L (last 30 days)" className="span-1">
+            <BarChart data={dailyPnl(trades)} />
+          </Widget>
+          <Widget title="Summary" className="span-1">
+            <div className="summary-grid">
+              <div><div className="label">Trades</div><div className="big">{s.count}</div></div>
+              <div><div className="label">Expectancy</div><div className={`big ${pnlClass(expectancy)}`}>{fmtMoney(expectancy)}</div></div>
+              <div><div className="label">Best trade</div><div className={`big ${pnlClass(s.best)}`}>{fmtMoney(s.best)}</div></div>
+              <div><div className="label">Worst trade</div><div className={`big ${pnlClass(s.worst)}`}>{fmtMoney(s.worst)}</div></div>
+              <div><div className="label">Avg win</div><div className="big win">{fmtMoney(s.avgWin)}</div></div>
+              <div><div className="label">Avg loss</div><div className={`big ${s.avgLoss ? 'loss' : ''}`}>{fmtMoney(s.avgLoss)}</div></div>
+              <div><div className="label">Max drawdown</div><div className={`big ${s.maxDrawdown ? 'loss' : ''}`}>{fmtMoney(-s.maxDrawdown)}</div></div>
+              <div><div className="label">Fees paid</div><div className="big">{fmtMoney(s.fees, false)}</div></div>
+            </div>
+          </Widget>
+
+          <Widget title="Monthly calendar" className="span-3">
+            <MonthCalendar trades={trades} />
+          </Widget>
+          <Widget title="Current risk status" className="span-1">
+            <div className="seg">
+              <button className={riskRange === 'today' ? 'active' : ''} onClick={() => setRiskRange('today')}>Today</button>
+              <button className={riskRange === 'week' ? 'active' : ''} onClick={() => setRiskRange('week')}>This week</button>
+            </div>
+            <div className="risk-top">
+              <div>
+                <div className={`big ${pnlClass(risk.sum.net)}`}>{fmtMoney(risk.sum.net, false)}</div>
+                <div className="label">{riskRange === 'today' ? "Today's" : "This week's"} P&L</div>
+              </div>
+              <div>
+                <div className="big">{fmtPct(risk.sum.winRate)}</div>
+                <div className="label">Win rate</div>
+              </div>
+            </div>
+            <dl className="kv">
+              <dt>Current streak</dt>
+              <dd className={risk.streak.kind === 'win' ? 'win' : risk.streak.kind === 'loss' ? 'loss' : ''}>{risk.streak.length} {streakWord}</dd>
+              <dt>Trades today</dt><dd>{risk.tradesToday}</dd>
+              <dt>Current drawdown</dt>
+              <dd>{risk.dd.toFixed(2)}% <span className={`badge ${risk.dd > 10 ? 'neg' : 'pos'}`}>{risk.dd > 10 ? 'CAUTION' : 'SAFE'}</span></dd>
+            </dl>
+          </Widget>
+
+          <Widget title="Strategy performance (by tag)" className="span-2">
+            {strategies.length ? (
+              <div className="strategies">
+                {strategies.map((g) => (
+                  <div key={g.key} className="strategy">
+                    <div className="name">{g.key}</div>
+                    <div className={`big ${pnlClass(g.net)}`}>{fmtMoney(g.net)}</div>
+                    <div className="muted">{g.count} {plural(g.count, 'trade', 'trades')} · {fmtPct(g.winRate)} win</div>
+                  </div>
+                ))}
+              </div>
+            ) : <div className="widget-empty">Tag your trades to see strategies here</div>}
+          </Widget>
+          <Widget title="Volume (trades by symbol)" className="span-2"><BarChart data={volumeBySymbol(trades)} money={false} /></Widget>
+
+          <Widget title="Account safety score" className="span-2">
+            <div className="safety">
+              <Gauge value={safety} label="Safety score" />
+              <div className="tiles">
+                <div className="tile"><span className="label">Win rate</span><b>{fmtPct(s.winRate)}</b><i className={s.winRate > 0.52 ? 'ok' : ''}>NEED &gt; 52%</i></div>
+                <div className="tile"><span className="label">Risk : reward</span><b>{s.avgLoss ? (s.avgWin / -s.avgLoss).toFixed(2) : '—'}</b><i>AVG WIN / AVG LOSS</i></div>
+                <div className="tile"><span className="label">Expectancy</span><b className={pnlClass(expectancy)}>{fmtMoney(expectancy, false)}</b><i>PER TRADE</i></div>
+                <div className="tile"><span className="label">Max drawdown</span><b className={s.maxDrawdown ? 'loss' : ''}>{fmtMoney(-s.maxDrawdown, false)}</b><i>PEAK TO TROUGH</i></div>
+              </div>
+            </div>
+            <p className="safety-note">{s.count >= 5 ? 'Score blends win rate, profit factor and risk:reward.' : `Needs at least 5 closed trades for a rating — you have ${s.count}.`}</p>
+          </Widget>
+          <Widget title="Compare (long vs short)" className="span-2"><Compare trades={trades} /></Widget>
+
+          <Widget title="Yearly calendar" className="span-4"><YearCalendar trades={trades} /></Widget>
+
+          <Widget title="Entry price" className="span-1"><DistList data={entryPriceBuckets(trades)} /></Widget>
+          <Widget title="Volume change" className="span-1"><DistList data={volumeBuckets(trades)} /></Widget>
+          <Widget title="Change percent" className="span-1"><DistList data={changePctBuckets(trades)} /></Widget>
+          <Widget title="Open positions" className="span-1">
+            {open.length ? (
+              <div className="dist">
+                {open.slice(0, 8).map((t) => (
+                  <div key={t.id} className="dist-top"><span>{t.symbol} <span className="muted">{t.side ?? ''}</span></span><b>{t.size ?? ''} @ {t.entry_price ?? '—'}</b></div>
+                ))}
+              </div>
+            ) : <div className="widget-empty">No open positions</div>}
+          </Widget>
+
+          <Widget title="Weekday" className="span-1"><BarChart data={weekdayPnl(trades)} /></Widget>
+          <Widget title="Hourly" className="span-1"><BarChart data={hourlyPnl(trades)} /></Widget>
+          <Widget title="Hold time" className="span-1"><BarChart data={holdTimePnl(trades)} /></Widget>
+          <Widget title="Monthly" className="span-1"><BarChart data={monthlyPnl(trades)} /></Widget>
+        </div>
+      )}
     </>
   )
 }

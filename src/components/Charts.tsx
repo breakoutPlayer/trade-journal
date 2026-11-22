@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { checkChartFile, useChartUrls } from '../lib/charts'
 
 /** Full-screen view of one image; click anywhere or press Esc to close. */
-function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
+export function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)

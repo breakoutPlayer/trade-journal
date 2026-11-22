@@ -41,6 +41,27 @@ export function netPnl(t: Pick<Trade, 'pnl' | 'fees'>) {
   return (Number(t.pnl) || 0) - (Number(t.fees) || 0)
 }
 
+/** Net P&L as a fraction of the position's cost (entry × size), or null when unknown. */
+export function tradeReturn(t: Trade) {
+  const cost = Math.abs((Number(t.entry_price) || 0) * (Number(t.size) || 0))
+  return cost ? netPnl(t) / cost : null
+}
+
+export type TradeStatus = 'WIN' | 'LOSS' | 'BE' | 'OPEN'
+export function tradeStatus(t: Trade): TradeStatus {
+  if (!t.closed_at && t.exit_price == null && t.pnl == null) return 'OPEN'
+  const n = netPnl(t)
+  return n > 0 ? 'WIN' : n < 0 ? 'LOSS' : 'BE'
+}
+
+/** Turns "column does not exist" errors for the newer columns into a pointer at the README SQL. */
+export function friendlySaveError(err: unknown) {
+  const msg = (err as Error)?.message ?? String(err)
+  return /mistakes|targets|stops/.test(msg) && /column|schema cache/i.test(msg)
+    ? 'Your trades table is missing the mistakes/targets/stops columns. Run the SQL under "Trade details" in the README once in the Supabase SQL Editor.'
+    : msg
+}
+
 /** The moment a trade "counts": when it closed, else when it opened, else when it was logged. */
 export function tradeTime(t: Pick<Trade, 'closed_at' | 'opened_at' | 'created_at'>) {
   return new Date(t.closed_at ?? t.opened_at ?? t.created_at)
