@@ -26,3 +26,9 @@ dist-ssr
 # Supabase keys
 .env.local
 .env*.local
+.env
+.env.production
+.env.development
+supabase/.env
+supabase/.temp
+supabase/.branches

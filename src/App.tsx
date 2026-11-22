@@ -11,11 +11,12 @@ import { Dashboard } from './pages/Dashboard'
 import { Calendar } from './pages/Calendar'
 import { Analytics } from './pages/Analytics'
 import { Journal } from './pages/Journal'
+import { Connections } from './pages/Connections'
 import { Logo } from './components/Logo'
 import { NavIcon } from './components/NavIcon'
 
-const TABS = ['Dashboard', 'Trades', 'Journal', 'Calendar', 'Analytics', 'Import'] as const
-const TAB_LABELS: Record<(typeof TABS)[number], string> = { Dashboard: 'Dashboard', Trades: 'Trades', Journal: 'Journal', Calendar: 'Calendar', Analytics: 'Reports', Import: 'Import' }
+const TABS = ['Dashboard', 'Trades', 'Journal', 'Calendar', 'Analytics', 'Import', 'Connections'] as const
+const TAB_LABELS: Record<(typeof TABS)[number], string> = { Dashboard: 'Dashboard', Trades: 'Trades', Journal: 'Journal', Calendar: 'Calendar', Analytics: 'Reports', Import: 'Import', Connections: 'Connections' }
 type Tab = (typeof TABS)[number]
 
 export default function App() {
@@ -105,6 +106,7 @@ export default function App() {
         {tab === 'Calendar' && <Calendar trades={trades} />}
         {tab === 'Analytics' && <Analytics trades={trades} />}
         {tab === 'Import' && <Import trades={trades} reload={reload} />}
+        {tab === 'Connections' && <Connections reload={reload} />}
       </main>
     </>
   )

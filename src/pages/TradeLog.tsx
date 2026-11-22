@@ -23,29 +23,34 @@ export function TradeLog({ trades, reload, openId, setOpenId }: Props) {
   const [setup, setSetup] = useState('')
   const [mistake, setMistake] = useState('')
   const [side, setSide] = useState('')
+  const [account, setAccount] = useState('')
   const [asc, setAsc] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const allSetups = useMemo(() => [...new Set(trades.flatMap((t) => t.tags ?? []))].sort(), [trades])
   const allMistakes = useMemo(() => [...new Set(trades.flatMap((t) => t.mistakes ?? []))].sort(), [trades])
+  // "Exchange · Account" pairs from synced trades.
+  const accountKey = (t: Trade) => (t.account ? `${t.exchange ?? ''} · ${t.account}` : '')
+  const allAccounts = useMemo(() => [...new Set(trades.map(accountKey).filter(Boolean))].sort(), [trades])
 
   const q = search.trim().toLowerCase()
   const shown = useMemo(() => {
     const list = trades.filter((t) => {
-      const hay = `${t.symbol} ${t.notes ?? ''} ${t.exchange ?? ''}`.toLowerCase()
+      const hay = `${t.symbol} ${t.notes ?? ''} ${t.exchange ?? ''} ${t.account ?? ''}`.toLowerCase()
       return (
         (!q || hay.includes(q)) &&
+        (!account || accountKey(t) === account) &&
         (!setup || (t.tags ?? []).includes(setup)) &&
         (!mistake || (t.mistakes ?? []).includes(mistake)) &&
         (!side || t.side === side)
       )
     })
     return list.sort((a, b) => (asc ? openTime(a) - openTime(b) : openTime(b) - openTime(a)))
-  }, [trades, q, setup, mistake, side, asc])
+  }, [trades, q, setup, mistake, side, account, asc])
 
   const s = useMemo(() => summarize(shown), [shown])
-  const filtered = Boolean(q || setup || mistake || side)
-  const clearAll = () => { setSearch(''); setSetup(''); setMistake(''); setSide('') }
+  const filtered = Boolean(q || setup || mistake || side || account)
+  const clearAll = () => { setSearch(''); setSetup(''); setMistake(''); setSide(''); setAccount('') }
 
   const opened = openId ? trades.find((t) => t.id === openId) : undefined
   if (opened) {
@@ -117,6 +122,12 @@ export function TradeLog({ trades, reload, openId, setOpenId }: Props) {
           <option value="long">Long</option>
           <option value="short">Short</option>
         </select>
+        {allAccounts.length > 0 && (
+          <select className="range-select" value={account} onChange={(e) => setAccount(e.target.value)} aria-label="Account">
+            <option value="">All accounts</option>
+            {allAccounts.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        )}
         {filtered && <button className="chip-btn" onClick={clearAll}>Clear all ×</button>}
       </div>
 

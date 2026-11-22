@@ -85,6 +85,37 @@ create policy "own journal notes" on journal_notes for all to authenticated
 - **Bitunix** — Futures → Position History → Export. Columns are matched by common names; if something isn't recognized, the importer lists the headers it found.
 - Re-importing the same file skips duplicates.
 
+## Exchange auto-sync (Bitunix, Binance, OKX)
+
+The **Connections** tab pulls closed trades automatically (hourly, plus a "Sync now" button). Supported: Bitunix futures, Binance USDT-M futures, OKX perpetual swaps. The first sync backfills 90 days.
+
+**Security model**
+- API keys are sent once to the `connections` Edge Function, checked, encrypted with AES-GCM (`ENCRYPTION_KEY` function secret) and stored in `exchange_secrets`, a table the browser can never read (RLS on, no policies). They are never returned to the page, logged, or committed.
+- Only **read-only** keys are accepted. Binance and OKX keys with trading, transfer or withdrawal permission are rejected. Bitunix can't report permissions, so you must tick a confirmation box — create the key with trading and withdrawals **off**.
+- IP whitelisting isn't used because Supabase Edge Function IPs change; read-only permission is the protection.
+- Removing a connection deletes its key and keeps its trades. Trades already imported by CSV aren't duplicated.
+
+**One-time setup** (PowerShell, in the project folder):
+1. `npx supabase login`, then `npx supabase link --project-ref <your-project-ref>`.
+2. Generate two secrets and store them as function secrets (don't commit them):
+   ```powershell
+   $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+   $b = New-Object byte[] 32; $rng.GetBytes($b); $enc = [Convert]::ToBase64String($b)
+   $c = New-Object byte[] 32; $rng.GetBytes($c); $cron = -join ($c | % { $_.ToString('x2') })
+   npx supabase secrets set ENCRYPTION_KEY=$enc CRON_SECRET=$cron
+   ```
+   Optionally also `npx supabase secrets set ALLOWED_ORIGIN=https://<you>.github.io` to restrict which site may call the functions.
+   Keep `ENCRYPTION_KEY` backed up somewhere private: if it's lost, re-add your connections.
+3. `npx supabase db push` (runs `supabase/migrations`). Or paste `20261122000000_exchange_sync.sql` into the SQL Editor.
+4. Deploy the functions (`sync` verifies the user itself so the hourly cron can call it):
+   ```powershell
+   npx supabase functions deploy connections
+   npx supabase functions deploy sync --no-verify-jwt
+   ```
+5. Hourly schedule: in the SQL Editor, create two Vault secrets — `project_url` (`https://<ref>.supabase.co`) and `cron_secret` (the same `CRON_SECRET`) — `db push` already applied `20261122000100_sync_cron.sql`; the hourly job simply fails until both Vault secrets exist. Check runs under **Integrations → Cron**.
+
+**Adding another exchange:** write an adapter in `supabase/functions/_shared/exchanges/`, register it in `index.ts`, add its id to the `exchange` check in the migration and to `src/lib/connections.ts`.
+
 ## Deploying to GitHub Pages
 
 `vite.config.ts` sets `base: '/trade-journal/'`. The workflow in `.github/workflows/deploy.yml` builds and deploys on every push to `main`.

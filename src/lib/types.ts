@@ -19,6 +19,9 @@ export interface Trade {
   mistakes?: string[] | null
   targets?: number[] | null // profit target prices
   stops?: number[] | null // stop-loss prices
+  // Set by exchange auto-sync (see supabase/migrations). Null for manual/CSV trades.
+  external_id?: string | null
+  account?: string | null // connection label, e.g. "Main"
   created_at: string
 }
 

@@ -5,6 +5,7 @@ const PATHS: Record<string, string> = {
   Journal: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5',
   Analytics:'M4 20V10M10 20V4M16 20v-7M22 20H2',
   Import: 'M12 3v12M7 10l5 5 5-5M4 20h16',
+  Connections: 'M9 15l6-6M7 11l-2 2a3.5 3.5 0 0 0 5 5l2-2M17 13l2-2a3.5 3.5 0 0 0-5-5l-2 2',
 }
 
 export function NavIcon({ name }: { name: string }) {
