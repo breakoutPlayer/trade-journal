@@ -10,11 +10,12 @@ import { Import } from './pages/Import'
 import { Dashboard } from './pages/Dashboard'
 import { Calendar } from './pages/Calendar'
 import { Analytics } from './pages/Analytics'
+import { Journal } from './pages/Journal'
 import { Logo } from './components/Logo'
 import { NavIcon } from './components/NavIcon'
 
-const TABS = ['Dashboard', 'Trades', 'Calendar', 'Analytics', 'Import'] as const
-const TAB_LABELS: Record<(typeof TABS)[number], string> = { Dashboard: 'Dashboard', Trades: 'Trades', Calendar: 'Calendar', Analytics: 'Reports', Import: 'Import' }
+const TABS = ['Dashboard', 'Trades', 'Journal', 'Calendar', 'Analytics', 'Import'] as const
+const TAB_LABELS: Record<(typeof TABS)[number], string> = { Dashboard: 'Dashboard', Trades: 'Trades', Journal: 'Journal', Calendar: 'Calendar', Analytics: 'Reports', Import: 'Import' }
 type Tab = (typeof TABS)[number]
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>(TABS[0])
   const [trades, setTrades] = useState<Trade[]>([])
   const [loadError, setLoadError] = useState('')
+  const [openTradeId, setOpenTradeId] = useState<string | null>(null) // trade shown in the Trades detail view
 
   useEffect(() => {
     if (configMissing) return
@@ -81,7 +83,7 @@ export default function App() {
         <Logo />
         <nav className="tabs">
           {TABS.map((t) => (
-            <button key={t} className={t === tab ? 'active' : ''} onClick={() => setTab(t)} title={TAB_LABELS[t]} aria-label={TAB_LABELS[t]}>
+            <button key={t} className={t === tab ? 'active' : ''} onClick={() => { setTab(t); setOpenTradeId(null) }} title={TAB_LABELS[t]} aria-label={TAB_LABELS[t]}>
               <NavIcon name={t} />
               <span className="nav-text">{TAB_LABELS[t]}</span>
             </button>
@@ -98,7 +100,8 @@ export default function App() {
       <main>
         {loadError && <div className="panel error">Could not load trades: {loadError}</div>}
         {tab === 'Dashboard' && <Dashboard trades={trades} />}
-        {tab === 'Trades' && <TradeLog trades={trades} reload={reload} />}
+        {tab === 'Trades' && <TradeLog trades={trades} reload={reload} openId={openTradeId} setOpenId={setOpenTradeId} />}
+        {tab === 'Journal' && <Journal trades={trades} reload={reload} openTrade={(id) => { setOpenTradeId(id); setTab('Trades') }} />}
         {tab === 'Calendar' && <Calendar trades={trades} />}
         {tab === 'Analytics' && <Analytics trades={trades} />}
         {tab === 'Import' && <Import trades={trades} reload={reload} />}

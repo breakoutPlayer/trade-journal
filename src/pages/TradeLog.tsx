@@ -10,14 +10,15 @@ import { TradeDetail } from './TradeDetail'
 interface Props {
   trades: Trade[]
   reload: () => void
+  openId: string | null // trade shown in the detail view (kept in App so other pages can open a trade)
+  setOpenId: (id: string | null) => void
 }
 
 const openTime = (t: Trade) => new Date(t.opened_at ?? t.closed_at ?? t.created_at).getTime()
 const fmtDay = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' })
 
-export function TradeLog({ trades, reload }: Props) {
+export function TradeLog({ trades, reload, openId, setOpenId }: Props) {
   const [editing, setEditing] = useState<Trade | 'new' | null>(null)
-  const [openId, setOpenId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [setup, setSetup] = useState('')
   const [mistake, setMistake] = useState('')

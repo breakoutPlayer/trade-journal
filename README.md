@@ -53,6 +53,27 @@ alter table trades add column if not exists stops numeric[] not null default '{}
 
 Note templates ("Save as new template" in the Notes tab) are kept in your browser, not in Supabase.
 
+## Journal
+
+The Journal page has Daily notes (one per trading day, shown with that day's stats and trades), Trade notes (every trade that has notes) and General notes. Daily and general notes live in their own table. Run this once in the SQL Editor:
+
+```sql
+create table if not exists journal_notes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users on delete cascade,
+  kind text not null check (kind in ('daily', 'general')),
+  day date,
+  title text,
+  body text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, kind, day)
+);
+alter table journal_notes enable row level security;
+create policy "own journal notes" on journal_notes for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+```
+
 ## How P&L is stored
 
 - `pnl` = gross realized P&L, `fees` = fees paid. Every stat uses **net = pnl − fees**.
