@@ -22,6 +22,21 @@ async function signedGet(creds: Creds, path: string, params: Record<string, stri
   return body.data
 }
 
+/**
+ * Long or short. The `side` field's values aren't reliable in practice, so when prices are known
+ * pick the direction whose price move best explains the gross P&L; fall back to the field.
+ */
+function sideOf(raw: unknown, entry: number | null, exit: number | null, size: number | null, gross: number): 'long' | 'short' | null {
+  if (entry != null && exit != null && size && exit !== entry && gross !== 0) {
+    const move = size * (exit - entry)
+    return Math.abs(gross - move) <= Math.abs(gross + move) ? 'long' : 'short'
+  }
+  const s = String(raw ?? '').toUpperCase()
+  if (s.includes('SHORT') || s.includes('SELL')) return 'short'
+  if (s.includes('LONG') || s.includes('BUY')) return 'long'
+  return null
+}
+
 export const bitunix: ExchangeAdapter = {
   id: 'bitunix',
   label: 'Bitunix',
@@ -44,17 +59,23 @@ export const bitunix: ExchangeAdapter = {
       for (const p of list) {
         const closedMs = Number(p.mtime)
         if (!closedMs || closedMs < sinceMs) continue
-        const realized = num(p.realizedPNL) ?? 0 // excludes fee and funding
+        // Checked against real data: realizedPNL already has trading fees subtracted (the docs say
+        // otherwise). It excludes funding. Our `pnl` is gross of fees with funding folded in.
+        const fee = Math.abs(num(p.fee) ?? 0)
         const funding = num(p.funding) ?? 0
+        const gross = (num(p.realizedPNL) ?? 0) + fee
+        const entry = num(p.entryPrice)
+        const exit = num(p.closePrice)
+        const size = num(p.maxQty)
         out.push({
           external_id: String(p.positionId),
           symbol: normSymbol(String(p.symbol)),
-          side: String(p.side).toUpperCase() === 'SHORT' ? 'short' : 'long',
-          entry_price: num(p.entryPrice),
-          exit_price: num(p.closePrice),
-          size: num(p.maxQty),
-          pnl: r8(realized + funding), // funding counts toward the result, like the CSV importer
-          fees: r8(Math.abs(num(p.fee) ?? 0)),
+          side: sideOf(p.side, entry, exit, size, gross),
+          entry_price: entry,
+          exit_price: exit,
+          size,
+          pnl: r8(gross + funding), // funding counts toward the result, like the CSV importer
+          fees: r8(fee),
           exchange: 'Bitunix',
           opened_at: iso(p.ctime),
           closed_at: iso(closedMs),
