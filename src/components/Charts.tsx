@@ -44,23 +44,6 @@ function Thumbs({ items }: { items: Thumb[] }) {
   )
 }
 
-/** Read-only modal showing a trade's saved charts. */
-export function ChartViewer({ title, paths, onClose }: { title: string; paths: string[]; onClose: () => void }) {
-  const { urls, error } = useChartUrls(paths)
-  return (
-    <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="row" style={{ marginBottom: 12 }}>
-          <h2 style={{ margin: 0 }}>{title}</h2>
-          <span className="spacer" />
-          <button onClick={onClose}>Close</button>
-        </div>
-        {error && <div className="error">{error}</div>}
-        <Thumbs items={paths.map((p) => ({ key: p, src: urls[p] }))} />
-      </div>
-    </div>
-  )
-}
 
 export interface PendingChart {
   file: File

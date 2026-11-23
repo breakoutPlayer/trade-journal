@@ -18,12 +18,6 @@ function bucket(trades: Trade[], keyOf: (t: Trade) => string): Map<string, { val
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/** Net P&L per calendar day, oldest first (last `limit` active days). */
-export function dailyPnl(trades: Trade[], limit = 30): Bar[] {
-  const m = bucket(trades, (t) => dayKey(tradeTime(t)))
-  return [...m.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-limit)
-    .map(([k, v]) => ({ label: k.slice(5), ...v }))
-}
 
 export function weekdayPnl(trades: Trade[]): Bar[] {
   const m = bucket(trades, (t) => WEEKDAYS[(tradeTime(t).getDay() + 6) % 7])
@@ -112,12 +106,6 @@ function ranged(trades: Trade[], edges: [string, number][], valueOf: (t: Trade) 
   }
   return out.filter((b) => b.count)
 }
-
-export const entryPriceBuckets = (trades: Trade[]) =>
-  ranged(trades, [['Under $10', 10], ['$10 - $50', 50], ['$50 - $100', 100], ['$100 - $500', 500], ['$500 - $1000', 1000], ['$1000 and Over', Infinity]], (t) => t.entry_price)
-
-export const volumeBuckets = (trades: Trade[]) =>
-  ranged(trades, [['Under 1', 1], ['1 - 9.99', 10], ['10 - 19.99', 20], ['20 - 99.99', 100], ['100 and Over', Infinity]], (t) => t.size)
 
 /** % move from entry to exit, signed so a profitable direction is positive. */
 export const changePctBuckets = (trades: Trade[]) =>
