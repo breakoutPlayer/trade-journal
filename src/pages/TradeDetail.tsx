@@ -236,14 +236,14 @@ function Strategy({ trade, allSetups, allMistakes, save, strategies, categories 
 /** Choose the strategy this trade followed; its rules show as a checklist for review (not saved). */
 function StrategyPicker({ trade, strategies, save }: { trade: Trade; strategies: StrategyDef[]; save: Save }) {
   const current = strategies.find((s) => s.id === trade.strategy_id)
-  if (!strategies.length) return <p className="muted" style={{ margin: 0 }}>No strategies yet. Create one in Settings → My Strategies.</p>
+  if (!strategies.length) return <p className="muted m-0">No strategies yet. Create one in Settings → My Strategies.</p>
   return (
     <>
       <select className="range-select" value={trade.strategy_id ?? ''} onChange={(e) => save({ strategy_id: e.target.value || null })} aria-label="Strategy">
         <option value="">No strategy</option>
         {strategies.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
       </select>
-      {current?.description && <p className="muted" style={{ margin: '8px 0 0', fontSize: 13 }}>{current.description}</p>}
+      {current?.description && <p className="muted mt-8 fs-13">{current.description}</p>}
       {current && current.rules.length > 0 && (
         <ul className="td-rules">
           {current.rules.map((r, i) => <li key={`${trade.id}-${i}`}><label><input type="checkbox" />{r}</label></li>)}
@@ -256,7 +256,7 @@ function StrategyPicker({ trade, strategies, save }: { trade: Trade; strategies:
 /** One row of toggle chips per custom tag category. */
 function CustomTags({ trade, categories, save }: { trade: Trade; categories: TagCategory[]; save: Save }) {
   const values = trade.custom_tags ?? []
-  if (!categories.length) return <p className="muted" style={{ margin: 0 }}>No custom tags yet. Create categories in Settings → Custom Tags.</p>
+  if (!categories.length) return <p className="muted m-0">No custom tags yet. Create categories in Settings → Custom Tags.</p>
   const toggle = (v: string) => save({ custom_tags: values.includes(v) ? values.filter((x) => x !== v) : [...values, v] })
   return (
     <>
@@ -264,7 +264,7 @@ function CustomTags({ trade, categories, save }: { trade: Trade; categories: Tag
         <div key={c.id} className="ctag-group">
           <span className="label"><span className="dot" style={{ background: c.color }} />{c.name}</span>
           <div className="chips">
-            {c.tags.length === 0 && <span className="muted" style={{ fontSize: 12 }}>No tags in this category yet.</span>}
+            {c.tags.length === 0 && <span className="muted fs-12">No tags in this category yet.</span>}
             {c.tags.map((t) => {
               const v = customTag(c.name, t)
               const on = values.includes(v)

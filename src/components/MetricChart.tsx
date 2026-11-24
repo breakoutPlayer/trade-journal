@@ -50,7 +50,7 @@ export function MetricChart({ points, mode, fmt }: { points: SeriesPoint[]; mode
             <text x={W - PAD.r + 8} y={y(v) + 4} fontSize="11" fill="var(--muted)">{fmt(v)}</text>
           </g>
         ))}
-        <line x1={PAD.l} x2={W - PAD.r} y1={y(0)} y2={y(0)} stroke="var(--muted)" strokeOpacity="0.5" />
+        <line x1={PAD.l} x2={W - PAD.r} y1={y(0)} y2={y(0)} stroke="var(--accent)" strokeOpacity="0.45" />
         {mode === 'line' ? (
           <>
             <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
@@ -67,7 +67,7 @@ export function MetricChart({ points, mode, fmt }: { points: SeriesPoint[]; mode
         {hover != null && <line x1={mode === 'bar' ? bx(hover) : x(hover)} x2={mode === 'bar' ? bx(hover) : x(hover)} y1={PAD.t} y2={H - PAD.b} stroke="var(--muted)" strokeOpacity="0.5" />}
       </svg>
       {hp && (
-        <div className="panel" style={{ position: 'absolute', top: 8, left: 12, pointerEvents: 'none', padding: '6px 10px', fontSize: 12 }}>
+        <div className="panel" style={{ position: 'absolute', top: 8, left: 12, pointerEvents: 'none', padding: '8px 12px', fontSize: 12 }}>
           <div className="muted">{hp.label}</div>
           <strong>{fmt(hp.value)}</strong>
         </div>

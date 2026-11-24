@@ -81,12 +81,12 @@ export function Import({ trades, reload }: Props) {
             Tags to add to every imported trade
             <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="imported, nov" />
           </label>
-          <label className="wide" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label className="wide check-row">
             <input type="checkbox" style={{ width: 'auto' }} checked={feesInPnl} onChange={(e) => setFeesInPnl(e.target.checked)} />
             The P&amp;L column in this file already has fees subtracted
           </label>
         </div>
-        <p style={{ marginBottom: 0 }}>
+        <p className="mb-0">
           Hyperliquid: Portfolio → Trade History → Export as CSV. Fills are grouped into complete trades automatically.
           <br />
           Bitunix: Futures → Position History → Export.
@@ -98,8 +98,8 @@ export function Import({ trades, reload }: Props) {
 
       {result && (
         <div className="panel">
-          <div className="row" style={{ marginBottom: 12 }}>
-            <h2 style={{ margin: 0 }}>Preview: {fileName}</h2>
+          <div className="row mb-12">
+            <h2 className="m-0">Preview: {fileName}</h2>
             <span className="spacer" />
             <span className="muted">
               {fresh.length} new · {dupes} duplicate(s) skipped · net{' '}
@@ -110,7 +110,7 @@ export function Import({ trades, reload }: Props) {
             </button>
           </div>
           {result.warnings.map((w) => (
-            <p key={w} className="muted" style={{ margin: '4px 0' }}>⚠ {w}</p>
+            <p key={w} className="muted my-4">{w}</p>
           ))}
           <div className="table-wrap">
             <table>

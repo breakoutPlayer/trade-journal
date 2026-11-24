@@ -103,10 +103,10 @@ export function Connections({ reload }: Props) {
       {message && <div className={`panel ${message.kind}`}>{message.text}</div>}
 
       <div className="panel">
-        <div className="row" style={{ marginBottom: 12 }}>
-          <h2 style={{ margin: 0 }}>Connected accounts</h2>
+        <div className="row mb-12">
+          <h2 className="m-0">Connected accounts</h2>
           <span className="spacer" />
-          <label className="muted" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label className="muted check-row">
             Sync range
             <select
               className="range-select"
@@ -149,11 +149,11 @@ export function Connections({ reload }: Props) {
                         : c.last_status === 'error' ? <span className="loss" title={c.last_error ?? ''}>Error</span>
                         : c.last_status === 'running' ? 'Syncing…'
                         : c.last_status === 'ok' ? <span className="win">OK</span> : <span className="muted">Not synced</span>}
-                      {c.last_status === 'error' && c.last_error && <div className="muted" style={{ fontSize: 12, maxWidth: 320 }}>{c.last_error}</div>}
+                      {c.last_status === 'error' && c.last_error && <div className="muted fs-12 maxw-320">{c.last_error}</div>}
                     </td>
                     <td>{c.last_synced_at ? fmtDateTime(c.last_synced_at) : '—'}</td>
                     <td className="num">{c.last_new_count ?? '—'}</td>
-                    <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                    <td className="nowrap-r">
                       <button disabled={!!busy || !c.enabled} onClick={() => sync(c.id)}>{busy === c.id ? 'Syncing…' : 'Sync now'}</button>{' '}
                       <button disabled={!!busy} onClick={() => toggle(c)}>{c.enabled ? 'Pause' : 'Resume'}</button>{' '}
                       <button disabled={!!busy} onClick={() => remove(c)}>Remove</button>
@@ -167,7 +167,7 @@ export function Connections({ reload }: Props) {
       </div>
 
       <form className="panel" onSubmit={add} autoComplete="off">
-        <h2 style={{ marginTop: 0 }}>Add a connection</h2>
+        <h2 className="mt-0">Add a connection</h2>
         <div className="grid-form stack-sm">
           <label>
             Exchange
@@ -194,7 +194,7 @@ export function Connections({ reload }: Props) {
             </label>
           )}
           {exchange === 'bitunix' && (
-            <label className="wide" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <label className="wide check-row">
               <input type="checkbox" style={{ width: 'auto' }} checked={form.confirmReadOnly} onChange={(e) => setForm({ ...form, confirmReadOnly: e.target.checked })} />
               I confirm this key is read-only: trading and withdrawals are disabled.
             </label>
@@ -206,7 +206,7 @@ export function Connections({ reload }: Props) {
 
       {runs.length > 0 && (
         <div className="panel">
-          <h2 style={{ marginTop: 0 }}>Recent syncs</h2>
+          <h2 className="mt-0">Recent syncs</h2>
           <div className="table-wrap">
             <table>
               <thead>

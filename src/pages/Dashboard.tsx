@@ -202,7 +202,7 @@ export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
   return (
     <>
       <div className="row dash-head">
-        <h1 style={{ margin: 0 }}>Dashboard</h1>
+        <h1 className="m-0">Dashboard</h1>
         <span className="spacer" />
         {accounts.length > 0 && (
           <select className="range-select" value={active} onChange={(e) => setAccount(e.target.value)} aria-label="Account">

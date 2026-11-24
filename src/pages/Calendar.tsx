@@ -47,7 +47,7 @@ export function Calendar({ trades }: { trades: Trade[] }) {
     <>
       <h1>P&amp;L calendar</h1>
       <div className="panel">
-        <div className="row" style={{ marginBottom: 14 }}>
+        <div className="row mb-16">
           <button onClick={() => shift(-1)} aria-label="Previous month">‹</button>
           <h2 className="cal-title">
             {month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}

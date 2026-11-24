@@ -190,7 +190,7 @@ td.notes { white-space: normal; max-width: 260px; color: var(--muted); }
 @media (max-width: 720px) { .cal.week-cal { grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(44px, 1.2fr); } .cal.week-cal .day { min-height: 50px; } }
 /* Bar charts */
 .bars-plot { position: relative; height: 150px; display: flex; gap: 4px; }
-.bars-zero { position: absolute; left: 0; right: 0; height: 1px; background: var(--line); }
+.bars-zero { position: absolute; left: 0; right: 0; height: 1px; background: var(--accent); opacity: 0.45; }
 .bars-col { position: relative; flex: 1; min-width: 2px; }
 .bars-bar { position: absolute; left: 50%; width: min(76%, 56px); transform: translateX(-50%); border-radius: 3px; min-height: 2px; }
 .bars-labels { display: flex; gap: 4px; margin-top: 8px; font-size: 11px; color: var(--muted); }
@@ -804,3 +804,13 @@ main:has(> .td) { max-width: none; }
   .xfer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .set-row.xfer-row { grid-template-columns: 84px minmax(0, 1fr) 90px 32px; }
 }
+
+/* Spacing and text helpers (replace one-off inline styles) */
+.m-0 { margin: 0; } .mt-0 { margin-top: 0; } .mb-0 { margin-bottom: 0; }
+.mt-8 { margin: 8px 0 0; } .mt-16 { margin-top: 16px; }
+.mb-12 { margin-bottom: 12px; } .mb-16 { margin-bottom: 16px; }
+.my-4 { margin-block: 4px; } .mx-12 { margin-inline: 12px; }
+.fs-12 { font-size: 12px; } .fs-13 { font-size: 13px; } .fs-16 { font-size: 16px; }
+.maxw-320 { max-width: 320px; }
+.check-row { display: flex; align-items: center; gap: 8px; }
+.nowrap-r { white-space: nowrap; text-align: right; }

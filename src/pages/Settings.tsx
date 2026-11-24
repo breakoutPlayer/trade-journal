@@ -145,7 +145,7 @@ function Accounts({ trades }: { trades: Trade[] }) {
           const bal = balances[key]
           return editing === key ? (
             <form key={key} className="set-form" onSubmit={(e) => save(e, key)}>
-              <span className="set-name" style={{ flex: '1 1 160px' }}>{key}</span>
+              <span className="set-name grow">{key}</span>
               <input autoFocus inputMode="decimal" placeholder="e.g. 1000" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setEditing(null)} style={{ flex: '0 1 160px' }} aria-label={`Starting balance for ${key}`} />
               <button type="button" className="chip-btn" onClick={() => setEditing(null)}>Cancel</button>
               <button className="primary" disabled={act.busy}>{act.busy ? 'Saving…' : 'Save'}</button>
@@ -166,8 +166,8 @@ function Accounts({ trades }: { trades: Trade[] }) {
         })}
       </div>
 
-      <div className="set-head" style={{ marginTop: 18 }}>
-        <h2 style={{ margin: 0, fontSize: 16 }}>Deposits &amp; withdrawals</h2>
+      <div className="set-head mt-16">
+        <h2 className="m-0 fs-16">Deposits &amp; withdrawals</h2>
         <span className="spacer" />
         <button className="chip-btn" disabled={adding || rows.length === 0} onClick={() => setAdding(true)}>+ Deposit / withdrawal</button>
       </div>
@@ -370,7 +370,7 @@ function CategoryCard({ cat, trades, refresh }: { cat: TagCategory; trades: Trad
           </span>
         </div>
       )}
-      {act.error && <p className="error" style={{ margin: '0 12px' }}>{act.error}</p>}
+      {act.error && <p className="error mx-12">{act.error}</p>}
       <div className="chips set-tags">
         {cat.tags.map((t) => (
           <span key={t} className="chip ctag" style={{ borderColor: cat.color, color: cat.color }}>

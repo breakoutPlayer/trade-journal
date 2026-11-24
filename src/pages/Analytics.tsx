@@ -96,7 +96,7 @@ function Overview({ trades }: { trades: Trade[] }) {
 
         <section className="widget">
           <div className="label">Market stats</div>
-          <div className="rep-big" style={{ marginBottom: 12 }}>{tab}</div>
+          <div className="rep-big mb-12">{tab}</div>
           <div className="rep-tiles">
             {values.map(({ m, v }) => (
               <button key={m.id} className={`rep-tile ${m.id === sel.id ? 'sel' : ''}`} onClick={() => setSelected({ ...selected, [tab]: m.id })}>
@@ -166,7 +166,7 @@ export function Analytics({ trades }: { trades: Trade[] }) {
           <Overview trades={trades} />
         ) : (
           <>
-            <p style={{ marginTop: 0 }}>Days use your local time and the trade&apos;s close time. A trade with several tags counts toward each tag.</p>
+            <p className="mt-0">Days use your local time and the trade&apos;s close time. A trade with several tags counts toward each tag.</p>
             <Breakdown id={view} trades={trades} />
           </>
         )}
