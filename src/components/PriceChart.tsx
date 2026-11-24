@@ -109,16 +109,16 @@ export function PriceChart({ trade, loader = loadCandles }: { trade: Trade; load
     const long = trade.side !== 'short'
     const markers: SeriesMarker<Time>[] = []
     if (trade.opened_at && trade.entry_price != null)
-      markers.push({ time: snap(Date.parse(trade.opened_at)), position: long ? 'belowBar' : 'aboveBar', shape: long ? 'arrowUp' : 'arrowDown', color: '#8b7cff', text: `Entry ${trade.entry_price}` })
+      markers.push({ time: snap(Date.parse(trade.opened_at)), position: long ? 'belowBar' : 'aboveBar', shape: long ? 'arrowUp' : 'arrowDown', color: '#d9c3a0', text: `Entry ${trade.entry_price}` })
     if (trade.closed_at && trade.exit_price != null)
-      markers.push({ time: snap(Date.parse(trade.closed_at)), position: long ? 'aboveBar' : 'belowBar', shape: long ? 'arrowDown' : 'arrowUp', color: '#f2b13c', text: `Exit ${trade.exit_price}` })
+      markers.push({ time: snap(Date.parse(trade.closed_at)), position: long ? 'aboveBar' : 'belowBar', shape: long ? 'arrowDown' : 'arrowUp', color: '#e8e8ea', text: `Exit ${trade.exit_price}` })
     markers.sort((a, b) => Number(a.time) - Number(b.time))
     createSeriesMarkers(series, markers)
 
     const price = (p: number | null | undefined, color: string, title: string, style = LineStyle.Dashed) =>
       p != null && series.createPriceLine({ price: Number(p), color, lineWidth: 1, lineStyle: style, axisLabelVisible: true, title })
-    price(trade.entry_price, '#8b7cff', 'Entry', LineStyle.Solid)
-    price(trade.exit_price, '#f2b13c', 'Exit', LineStyle.Solid)
+    price(trade.entry_price, '#d9c3a0', 'Entry', LineStyle.Solid)
+    price(trade.exit_price, '#e8e8ea', 'Exit', LineStyle.Solid)
     for (const t of trade.targets ?? []) price(t, win, 'Target')
     for (const s of trade.stops ?? []) price(s, loss, 'Stop')
 
@@ -133,7 +133,7 @@ export function PriceChart({ trade, loader = loadCandles }: { trade: Trade; load
         <b>{trade.symbol}USDT</b>
         {data && <span className="muted">{data.interval} Heikin-Ashi · {data.source} · times in your local zone</span>}
         <span className="spacer" />
-        <span className="pc-key"><i style={{ background: '#8b7cff' }} />Entry <i style={{ background: '#f2b13c' }} />Exit</span>
+        <span className="pc-key"><i style={{ background: '#d9c3a0' }} />Entry <i style={{ background: '#e8e8ea' }} />Exit</span>
       </div>
       {loading && <p className="muted pc-msg">Loading price data…</p>}
       {error && <p className="error pc-msg">{error}</p>}

@@ -157,7 +157,7 @@ function Sparkline({ trades }: { trades: Trade[] }) {
   const up = eq >= 0
   return (
     <svg className="jr-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden>
-      <polygon points={`0,${H} ${line} ${W},${H}`} fill={up ? 'rgba(63,208,176,0.15)' : 'rgba(255,122,107,0.15)'} />
+      <polygon points={`0,${H} ${line} ${W},${H}`} fill={up ? 'rgba(79,185,133,0.15)' : 'rgba(225,91,79,0.15)'} />
       <polyline points={line} fill="none" stroke={up ? 'var(--win)' : 'var(--loss)'} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
     </svg>
   )

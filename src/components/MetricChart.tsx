@@ -53,8 +53,8 @@ export function MetricChart({ points, mode, fmt }: { points: SeriesPoint[]; mode
         <line x1={PAD.l} x2={W - PAD.r} y1={y(0)} y2={y(0)} stroke="var(--muted)" strokeOpacity="0.5" />
         {mode === 'line' ? (
           <>
-            <path d={line} fill="none" stroke="#6366f1" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-            {n <= 60 && data.map((d, i) => <circle key={i} cx={x(i)} cy={y(d.v)} r="3.5" fill="var(--bg)" stroke="#6366f1" strokeWidth="2" />)}
+            <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+            {n <= 60 && data.map((d, i) => <circle key={i} cx={x(i)} cy={y(d.v)} r="3.5" fill="var(--bg)" stroke="var(--accent)" strokeWidth="2" />)}
           </>
         ) : (
           data.map((d, i) => {
