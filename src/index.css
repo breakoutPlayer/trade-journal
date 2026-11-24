@@ -8,6 +8,9 @@
   --muted: #9a9aa4;
   --faint: #6f6f78;
   --on-accent: #1b1710;
+  --on-pos: #05221b;
+  --on-neg: #2b0a06;
+  --hover: rgba(255, 255, 255, 0.04);
   --accent: #d9c3a0;
   --win: #4fb985;
   --loss: #e15b4f;
@@ -22,6 +25,30 @@
   color: var(--text);
   background: var(--bg);
   color-scheme: dark;
+}
+
+/* Light theme: same graphite ramp inverted, a deeper sand so the accent reads on white. */
+:root[data-theme='light'] {
+  --bg: #f4f4f5;
+  --panel: #ffffff;
+  --panel-2: #ececee;
+  --line: rgba(16, 16, 18, 0.1);
+  --text: #18181a;
+  --muted: #5f5f68;
+  --faint: #8a8a93;
+  --accent: #8c6a28;
+  --on-accent: #ffffff;
+  --on-pos: #ffffff;
+  --on-neg: #ffffff;
+  --hover: rgba(16, 16, 18, 0.04);
+  --win: #1d8458;
+  --loss: #c4392f;
+  --be: #6b6b75;
+  --win-bg: #def2e7;
+  --win-border: #6cbd93;
+  --loss-bg: #fbe1de;
+  --loss-border: #de8a80;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -98,7 +125,7 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 th { color: var(--muted); font-weight: 500; font-size: 12px; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-tr:hover td { background: rgba(255, 255, 255, 0.03); }
+tr:hover td { background: var(--hover); }
 td.notes { white-space: normal; max-width: 260px; color: var(--muted); }
 
 .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); margin: 1px 4px 1px 0; }
@@ -165,8 +192,8 @@ td.notes { white-space: normal; max-width: 260px; color: var(--muted); }
 .risk-top { display: flex; gap: 32px; margin-bottom: 16px; }
 .kv { display: grid; grid-template-columns: 1fr auto; gap: 12px 12px; margin: 0; font-size: 13px; }
 .kv dt { color: var(--muted); } .kv dd { margin: 0; text-align: right; font-weight: 600; }
-.badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-left: 8px; color: #05221b; }
-.badge.neg { color: #2b0a06; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-left: 8px; color: var(--on-pos); }
+.badge.neg { color: var(--on-neg); }
 .strategies { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .strategy { background: var(--bg); border-radius: 8px; padding: 12px 12px; font-size: 12px; }
 .strategy .name { font-weight: 600; margin-bottom: 4px; }
@@ -181,8 +208,8 @@ td.notes { white-space: normal; max-width: 260px; color: var(--muted); }
 .mini-stats .label { font-size: 11px; color: var(--muted); }
 .mini-stats b { font-size: 16px; font-variant-numeric: tabular-nums; }
 .cal-head { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 12px; }
-.pill { font-size: 12px; font-weight: 600; padding: 2px 12px; border-radius: 999px; color: #05221b; }
-.pill.neg { color: #2b0a06; }
+.pill { font-size: 12px; font-weight: 600; padding: 2px 12px; border-radius: 999px; color: var(--on-pos); }
+.pill.neg { color: var(--on-neg); }
 .cal.week-cal { grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(84px, 1.1fr); }
 .cal.week-cal .day { min-height: 70px; border: none; background: var(--bg); }
 .cal.week-cal .day.today { outline: 1px solid var(--accent); }
@@ -228,7 +255,7 @@ td.notes { white-space: normal; max-width: 260px; color: var(--muted); }
 .chart-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .chart-thumb { position: relative; aspect-ratio: 16 / 10; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--bg); display: grid; place-items: center; }
 .chart-thumb img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; display: block; }
-.chart-thumb .remove { position: absolute; top: 4px; right: 4px; padding: 0 8px; line-height: 22px; border-radius: 999px; background: rgba(0, 0, 0, 0.65); }
+.chart-thumb .remove { position: absolute; top: 4px; right: 4px; padding: 0 8px; line-height: 22px; border-radius: 999px; background: rgba(0, 0, 0, 0.65); color: #fff; }
 .drop { border: 1px dashed var(--line); border-radius: 8px; padding: 16px; text-align: center; font-size: 13px; color: var(--muted); cursor: pointer; }
 .drop:hover, .drop:focus, .drop.over { border-color: var(--accent); color: var(--text); outline: none; }
 .lightbox { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.88); display: grid; place-items: center; padding: 20px; cursor: zoom-out; }
@@ -483,7 +510,7 @@ td.notes { white-space: normal; max-width: 260px; color: var(--muted); }
 .td-main-img img { width: 100%; height: 100%; max-height: calc(100vh - 130px); object-fit: contain; cursor: zoom-in; display: block; }
 /* The trade view uses the full window width so the chart gets the extra space. */
 main:has(> .td) { max-width: none; }
-.td-img-remove { position: absolute; top: 8px; right: 8px; padding: 0 8px; line-height: 24px; border-radius: 999px; background: rgba(0, 0, 0, 0.65); }
+.td-img-remove { position: absolute; top: 8px; right: 8px; padding: 0 8px; line-height: 24px; border-radius: 999px; background: rgba(0, 0, 0, 0.65); color: #fff; }
 .td-strip { display: flex; gap: 8px; overflow-x: auto; }
 .td-thumb { flex: none; width: 96px; height: 60px; padding: 0; overflow: hidden; border-radius: 6px; background: var(--bg); display: grid; place-items: center; font-size: 20px; color: var(--muted); }
 .td-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -822,3 +849,11 @@ main:has(> .td) { max-width: none; }
 .maxw-320 { max-width: 320px; }
 .check-row { display: flex; align-items: center; gap: 8px; }
 .nowrap-r { white-space: nowrap; text-align: right; }
+
+/* Theme toggle: icon only on phones, in the rail on desktop. */
+.theme-toggle .nav-icon { display: block; width: 18px; height: 18px; }
+@media (max-width: 960px) {
+  .topbar .theme-toggle .nav-text { display: none; }
+  .topbar .theme-toggle .nav-icon { display: block; }
+  .topbar .account button.theme-toggle { padding: 8px; display: grid; place-items: center; }
+}

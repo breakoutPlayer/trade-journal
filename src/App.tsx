@@ -16,6 +16,7 @@ import { Settings } from './pages/Settings'
 import { Logo } from './components/Logo'
 import { NavIcon } from './components/NavIcon'
 import { TradeForm } from './components/TradeForm'
+import { useTheme } from './lib/theme'
 
 const TABS = ['Dashboard', 'Trades', 'Journal', 'Calendar', 'Analytics', 'Import', 'Connections'] as const
 const TAB_LABELS: Record<(typeof TABS)[number], string> = { Dashboard: 'Dashboard', Trades: 'Trades', Journal: 'Journal', Calendar: 'Calendar', Analytics: 'Reports', Import: 'Import', Connections: 'Connections' }
@@ -27,6 +28,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>(TABS[0])
   const [trades, setTrades] = useState<Trade[]>([])
   const [loadError, setLoadError] = useState('')
+  const [theme, toggleTheme] = useTheme()
   const [adding, setAdding] = useState(false) // quick "Add trade" form from the sidebar
   const [openTradeId, setOpenTradeId] = useState<string | null>(null) // trade shown in the Trades detail view
 
@@ -98,6 +100,9 @@ export default function App() {
         </nav>
         <div className="account">
           <span className="who">{session.user.email}</span>
+          <button className="theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+            <span className="nav-text">{theme === 'dark' ? 'Light' : 'Dark'}</span><NavIcon name={theme === 'dark' ? 'Sun' : 'Moon'} />
+          </button>
           <button className={tab === 'Settings' ? 'active' : ''} onClick={() => { setTab('Settings'); setOpenTradeId(null) }} title="Settings" aria-label="Settings">
             <span className="nav-text">Settings</span><NavIcon name="Settings" />
           </button>

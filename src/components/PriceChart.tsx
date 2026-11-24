@@ -4,6 +4,7 @@ import {
   type SeriesMarker, type Time, type UTCTimestamp,
 } from 'lightweight-charts'
 import { supabase } from '../lib/supabase'
+import { useTheme } from '../lib/theme'
 import type { Trade } from '../lib/types'
 
 interface Candle { t: number; o: number; h: number; l: number; c: number }
@@ -58,6 +59,7 @@ export const loadCandles: CandleLoader = async (req) => {
 /** Candlestick chart of the pair around the trade, with entry/exit markers and target/stop lines. */
 export function PriceChart({ trade, loader = loadCandles }: { trade: Trade; loader?: CandleLoader }) {
   const box = useRef<HTMLDivElement>(null)
+  const [theme] = useTheme()
   const [data, setData] = useState<Result | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -86,6 +88,7 @@ export function PriceChart({ trade, loader = loadCandles }: { trade: Trade; load
     const css = getComputedStyle(document.documentElement)
     const v = (name: string, fb: string) => css.getPropertyValue(name).trim() || fb
     const win = v('--win', '#4fb985'), loss = v('--loss', '#e15b4f'), muted = v('--muted', '#9a9aa4'), line = v('--line', '#2b2b30')
+    const entryColor = v('--accent', '#d9c3a0'), exitColor = v('--text', '#e8e8ea')
 
     const chart = createChart(el, {
       autoSize: true,
@@ -109,22 +112,22 @@ export function PriceChart({ trade, loader = loadCandles }: { trade: Trade; load
     const long = trade.side !== 'short'
     const markers: SeriesMarker<Time>[] = []
     if (trade.opened_at && trade.entry_price != null)
-      markers.push({ time: snap(Date.parse(trade.opened_at)), position: long ? 'belowBar' : 'aboveBar', shape: long ? 'arrowUp' : 'arrowDown', color: '#d9c3a0', text: `Entry ${trade.entry_price}` })
+      markers.push({ time: snap(Date.parse(trade.opened_at)), position: long ? 'belowBar' : 'aboveBar', shape: long ? 'arrowUp' : 'arrowDown', color: entryColor, text: `Entry ${trade.entry_price}` })
     if (trade.closed_at && trade.exit_price != null)
-      markers.push({ time: snap(Date.parse(trade.closed_at)), position: long ? 'aboveBar' : 'belowBar', shape: long ? 'arrowDown' : 'arrowUp', color: '#e8e8ea', text: `Exit ${trade.exit_price}` })
+      markers.push({ time: snap(Date.parse(trade.closed_at)), position: long ? 'aboveBar' : 'belowBar', shape: long ? 'arrowDown' : 'arrowUp', color: exitColor, text: `Exit ${trade.exit_price}` })
     markers.sort((a, b) => Number(a.time) - Number(b.time))
     createSeriesMarkers(series, markers)
 
     const price = (p: number | null | undefined, color: string, title: string, style = LineStyle.Dashed) =>
       p != null && series.createPriceLine({ price: Number(p), color, lineWidth: 1, lineStyle: style, axisLabelVisible: true, title })
-    price(trade.entry_price, '#d9c3a0', 'Entry', LineStyle.Solid)
-    price(trade.exit_price, '#e8e8ea', 'Exit', LineStyle.Solid)
+    price(trade.entry_price, entryColor, 'Entry', LineStyle.Solid)
+    price(trade.exit_price, exitColor, 'Exit', LineStyle.Solid)
     for (const t of trade.targets ?? []) price(t, win, 'Target')
     for (const s of trade.stops ?? []) price(s, loss, 'Stop')
 
     chart.timeScale().fitContent()
     return () => chart.remove()
-  }, [data, trade])
+  }, [data, trade, theme])
 
   if (!win) return <p className="muted pc-msg">Add an open or close time to this trade to see the price chart.</p>
   return (
@@ -133,7 +136,7 @@ export function PriceChart({ trade, loader = loadCandles }: { trade: Trade; load
         <b>{trade.symbol}USDT</b>
         {data && <span className="muted">{data.interval} Heikin-Ashi · {data.source} · times in your local zone</span>}
         <span className="spacer" />
-        <span className="pc-key"><i style={{ background: '#d9c3a0' }} />Entry <i style={{ background: '#e8e8ea' }} />Exit</span>
+        <span className="pc-key"><i style={{ background: 'var(--accent)' }} />Entry <i style={{ background: 'var(--text)' }} />Exit</span>
       </div>
       {loading && <p className="muted pc-msg">Loading price data…</p>}
       {error && <p className="error pc-msg">{error}</p>}
