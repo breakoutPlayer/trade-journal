@@ -5,7 +5,7 @@ import { equityCurve, groupStats, summarize } from '../lib/stats'
 import { dayKey, tradeTime } from '../lib/trades'
 import { fmtMoney, fmtMoneyShort, fmtPct, pnlClass } from '../lib/format'
 import {
-  currentDrawdownPct, currentStreak, holdTimePnl, hourlyPnl, monthlyPnl,
+  currentDrawdownPct, currentStreak, drawdownStats, holdTimePnl, hourlyPnl, monthlyPnl,
   volumeBySymbol, weekdayPnl, weekStart, changePctBuckets, yearMonths,
   type Bar,
 } from '../lib/dashboard'
@@ -174,9 +174,13 @@ export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
       sum: summarize(allTrades.filter((t) => tradeTime(t) >= from)),
       tradesToday: allTrades.filter((t) => dayKey(tradeTime(t)) === todayKey).length,
       streak: currentStreak(allTrades),
-      dd: currentDrawdownPct(allCurve),
+      // % of the account balance at the equity peak (same basis as the drawdown widgets). Without a balance, fall back to the P&L peak, capped at 100.
+      dd: (() => {
+        const pct = drawdownStats(allTrades, basis.startBalance, basis.transfers).current.pct
+        return pct != null ? Math.abs(pct) * 100 : Math.min(100, currentDrawdownPct(allCurve))
+      })(),
     }
-  }, [allTrades, riskRange, allCurve])
+  }, [allTrades, riskRange, allCurve, basis])
 
   const strategies = useMemo(
     () => groupStats(trades, (t) => t.tags ?? []).sort((a, b) => b.count - a.count).slice(0, 4),
