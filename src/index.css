@@ -25,6 +25,7 @@
 }
 
 * { box-sizing: border-box; }
+html, body { overflow-x: clip; }
 body { margin: 0; min-height: 100vh; background: var(--bg); }
 h1, h2, h3 { margin: 0 0 12px; font-weight: 600; letter-spacing: -0.01em; }
 h1 { font-size: 22px; }
@@ -155,7 +156,9 @@ td.notes { white-space: normal; max-width: 260px; color: var(--muted); }
 .split { display: flex; justify-content: space-between; font-size: 12px; margin-top: 4px; }
 .pos { background: var(--win); } .neg { background: var(--loss); } .neutral { background: var(--faint); }
 .widget-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0; }
-.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 12px; }
+.summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+.summary-grid > div { min-width: 0; }
+.summary-grid .big { font-size: 16px; overflow-wrap: anywhere; }
 .seg { display: inline-flex; background: var(--bg); border-radius: 8px; padding: 2px; margin-bottom: 16px; }
 .seg button { border: none; background: none; color: var(--muted); padding: 4px 12px; font-size: 12px; }
 .seg button.active { background: var(--panel-2); color: var(--text); }
@@ -790,11 +793,11 @@ main:has(> .td) { max-width: none; }
 .dd-sub { font-size: 13px; color: var(--muted); }
 
 /* Settings → Accounts */
-.acct-row .set-hint { margin-left: 8px; }
+.acct-row .set-hint { display: block; margin-left: 0; }
 @media (max-width: 860px) {
   .set-row.acct-row { grid-template-columns: minmax(0, 1fr) 90px 90px 48px; }
 }
-.set-row.acct-row { grid-template-columns: minmax(0, 1.4fr) 120px 100px 110px 120px 56px; }
+.set-row.acct-row { grid-template-columns: minmax(120px, 1.4fr) 88px 80px 96px 96px 48px; }
 .set-row.xfer-row { grid-template-columns: 110px minmax(0, 1fr) 120px 40px; }
 .xfer-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .xfer-form .seg { justify-self: start; }
