@@ -749,6 +749,11 @@ main:has(> .td) { max-width: none; }
 @media (max-width: 960px) {
   .topbar .add-trade { grid-area: add; white-space: nowrap; }
 }
+@media (max-width: 440px) {
+  /* Narrow phones: logo mark only, so Settings, Backup and Sign out always fit. */
+  .topbar .brand { font-size: 0; gap: 0; }
+  .tabs button { padding: 8px 10px; }
+}
 @media (max-width: 600px) {
   .topbar .add-trade { width: 36px; height: 36px; padding: 0; justify-content: center; }
   .topbar .add-trade .nav-text { display: none; }
