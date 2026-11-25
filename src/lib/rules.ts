@@ -75,3 +75,37 @@ export function newRuleId() {
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
+
+export interface MissedRule { setup: string; group: 'Bias' | 'Entry'; text: string; seen: number; missed: number }
+
+/**
+ * Rule compliance over reviewed trades (pass closed trades). Followed = every rule ticked.
+ * `missed` lists rules skipped at least once, most often first (by miss rate, then count).
+ */
+export function complianceStats(trades: Trade[], labels: Label[]) {
+  const withSetup = trades.filter((t) => tradeSetup(t))
+  const reviewed = withSetup.filter(isReviewed)
+  const followed = reviewed.filter((t) => isFollowed(reviewOf(t)!))
+  const notFollowed = reviewed.filter((t) => !isFollowed(reviewOf(t)!))
+
+  const rules = new Map<string, MissedRule>()
+  for (const t of reviewed) {
+    const r = reviewOf(t)!
+    const label = setupLabel(labels, r.setup)
+    for (const [group, list, current] of [['Bias', r.bias, label?.bias_rules], ['Entry', r.entry, label?.entry_rules]] as const) {
+      for (const x of list) {
+        const key = `${r.setup}\u0000${x.id}`
+        const m = rules.get(key) ?? { setup: r.setup, group, text: current?.find((c) => c.id === x.id)?.text ?? x.text, seen: 0, missed: 0 }
+        m.seen++
+        if (!x.ok) m.missed++
+        rules.set(key, m)
+      }
+    }
+  }
+  const missed = [...rules.values()].filter((m) => m.missed > 0)
+    .sort((a, b) => b.missed / b.seen - a.missed / a.seen || b.missed - a.missed)
+
+  // Waiting for review: has a setup with rules but not marked reviewed.
+  const pending = withSetup.filter((t) => ruleStatus(t, labels).kind === 'pending').length
+  return { pending, reviewed, followed, notFollowed, missed }
+}

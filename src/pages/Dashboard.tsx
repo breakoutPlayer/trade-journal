@@ -11,6 +11,7 @@ import {
 } from '../lib/dashboard'
 import { CalendarCard, CumulativeCard, DrawdownWidgets, PerformanceSummary, ScoreCard, StatCards } from '../components/DashboardWidgets'
 import { BarChart } from '../components/BarChart'
+import { RuleCompliance } from '../components/RuleCompliance'
 
 type Range = 'all' | '7d' | '30d' | 'month' | 'year'
 const RANGES: { id: Range; label: string }[] = [
@@ -234,6 +235,8 @@ export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
         <PerformanceSummary trades={trades} />
         <h2 className="perf-title">More insights</h2>
         <div className="dash">
+          <Widget title="Rule compliance" className="span-2"><RuleCompliance trades={trades} /></Widget>
+
           <Widget title="Summary" className="span-1">
             <div className="summary-grid">
               <div><div className="label">Trades</div><div className="big">{s.count}</div></div>

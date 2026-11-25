@@ -644,6 +644,23 @@ main:has(> .td) { max-width: none; }
 .rules-add { display: flex; gap: 8px; }
 .rules-add input { flex: 1 1 auto; min-width: 0; padding: 4px 8px; font-size: 13px; }
 td.rule-cell { white-space: normal; min-width: 96px; }
+/* Dashboard: rule compliance widget */
+.rc { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.rc-col { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.rc-col .label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.rc-head { display: flex; align-items: center; gap: 12px; }
+.rc-rate { font-size: 32px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.rc-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.rc-missed { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 13px; }
+.rc-missed li { display: flex; gap: 8px; justify-content: space-between; align-items: baseline; }
+.rc-rule { min-width: 0; overflow-wrap: anywhere; }
+.rc-missed b { font-variant-numeric: tabular-nums; }
+.rc-trend { display: flex; gap: 4px; height: 96px; }
+.rc-week { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.rc-track { flex: 1; position: relative; background: var(--bg); border-radius: 3px; }
+.rc-track span { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); border-radius: 3px; }
+.rc-week-label { font-size: 10px; color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 560px) { .rc { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) {
   .rules-two, .rules-cols { grid-template-columns: minmax(0, 1fr); }
   .tl-table .c-rules { grid-column: 2 / -1; }
