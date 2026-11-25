@@ -7,6 +7,7 @@ import { Lightbox } from '../components/Charts'
 import { NoteEditor } from '../components/NoteEditor'
 import { PriceChart } from '../components/PriceChart'
 import { customTag, useTradingTools, type Strategy as StrategyDef, type TagCategory } from '../lib/settings'
+import { TradingRules } from '../components/TradingRules'
 
 type Tab = 'overview' | 'strategy' | 'notes'
 const TABS: [Tab, string][] = [['overview', 'Overview'], ['strategy', 'Strategy'], ['notes', 'Notes']]
@@ -33,16 +34,21 @@ export function TradeDetail({ trade, allSetups, allMistakes, reload, onBack, onE
   const setups = [...new Set([...defined('setup'), ...allSetups])]
   const mistakes = [...new Set([...defined('mistake'), ...allMistakes])]
 
-  async function save(patch: Partial<TradeInput>) {
+  async function persist(patch: Partial<TradeInput>) {
     setError('')
     try {
       await updateTrade(trade.id, patch)
-      reload()
       return true
     } catch (err) {
       setError(friendlySaveError(err))
       return false
     }
+  }
+
+  async function save(patch: Partial<TradeInput>) {
+    const ok = await persist(patch)
+    if (ok) reload()
+    return ok
   }
 
   async function addCharts(files: File[]) {
@@ -115,8 +121,11 @@ export function TradeDetail({ trade, allSetups, allMistakes, reload, onBack, onE
               <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>
             ))}
           </div>
-          {tab === 'overview' && <Overview trade={trade} allSetups={setups} allMistakes={mistakes} save={save} />}
-          {tab === 'strategy' && <Strategy trade={trade} allSetups={setups} allMistakes={mistakes} save={save} strategies={tools.strategies} categories={tools.categories} />}
+          {tab === 'overview' && (
+            <Overview trade={trade} allMistakes={mistakes} save={save}
+              rules={<TradingRules key={trade.id} trade={trade} setups={setups} labels={tools.labels} loaded={tools.loaded} rulesMissing={tools.rulesMissing} persist={persist} reload={reload} />} />
+          )}
+          {tab === 'strategy' && <Strategy trade={trade} allMistakes={mistakes} save={save} strategies={tools.strategies} categories={tools.categories} />}
           {tab === 'notes' && <Notes key={trade.id} trade={trade} save={save} onImages={addCharts} uploading={uploading} />}
         </aside>
         <ChartPane trade={trade} onFiles={addCharts} onRemove={removeChart} uploading={uploading} />
@@ -139,7 +148,7 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
   )
 }
 
-function Overview({ trade, allSetups, allMistakes, save }: { trade: Trade; allSetups: string[]; allMistakes: string[]; save: Save }) {
+function Overview({ trade, allMistakes, save, rules }: { trade: Trade; allMistakes: string[]; save: Save; rules: ReactNode }) {
   const n = netPnl(trade)
   const r = tradeReturn(trade)
   const st = tradeStatus(trade)
@@ -186,9 +195,7 @@ function Overview({ trade, allSetups, allMistakes, save }: { trade: Trade; allSe
         </div>
         <RiskReward trade={trade} />
       </Section>
-      <Section title="Setups">
-        <ChipEditor kind="setup" values={trade.tags ?? []} suggestions={allSetups} onChange={(tags) => save({ tags })} />
-      </Section>
+      <Section title="Trading rules">{rules}</Section>
       <Section title="Mistakes">
         <ChipEditor kind="mistake" values={trade.mistakes ?? []} suggestions={allMistakes} onChange={(mistakes) => save({ mistakes })} />
       </Section>
@@ -204,7 +211,7 @@ function fmtDuration(ms: number) {
   return `${Math.floor(h / 24)}d ${h % 24}h`
 }
 
-function Strategy({ trade, allSetups, allMistakes, save, strategies, categories }: { trade: Trade; allSetups: string[]; allMistakes: string[]; save: Save; strategies: StrategyDef[]; categories: TagCategory[] }) {
+function Strategy({ trade, allMistakes, save, strategies, categories }: { trade: Trade; allMistakes: string[]; save: Save; strategies: StrategyDef[]; categories: TagCategory[] }) {
   const hold = trade.opened_at && trade.closed_at ? new Date(trade.closed_at).getTime() - new Date(trade.opened_at).getTime() : null
   return (
     <>
@@ -219,9 +226,6 @@ function Strategy({ trade, allSetups, allMistakes, save, strategies, categories 
       </Section>
       <Section title="Strategy">
         <StrategyPicker trade={trade} strategies={strategies} save={save} />
-      </Section>
-      <Section title="Setups">
-        <ChipEditor kind="setup" values={trade.tags ?? []} suggestions={allSetups} onChange={(tags) => save({ tags })} />
       </Section>
       <Section title="Mistakes">
         <ChipEditor kind="mistake" values={trade.mistakes ?? []} suggestions={allMistakes} onChange={(mistakes) => save({ mistakes })} />
@@ -283,7 +287,7 @@ function CustomTags({ trade, categories, save }: { trade: Trade; categories: Tag
 }
 
 /** Chips with × to remove and an inline "+ Add" box with suggestions from other trades. */
-function ChipEditor({ kind, values, suggestions, onChange }: { kind: 'setup' | 'mistake'; values: string[]; suggestions: string[]; onChange: (v: string[]) => void }) {
+function ChipEditor({ kind, values, suggestions, onChange }: { kind: 'mistake'; values: string[]; suggestions: string[]; onChange: (v: string[]) => void }) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const listId = `dl-${kind}`
@@ -305,7 +309,7 @@ function ChipEditor({ kind, values, suggestions, onChange }: { kind: 'setup' | '
       ))}
       {open ? (
         <form className="chip-add" onSubmit={(e) => { e.preventDefault(); add() }}>
-          <input autoFocus list={listId} value={text} onChange={(e) => setText(e.target.value)} placeholder={kind === 'setup' ? 'e.g. breakout' : 'e.g. fomo entry'} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)} onBlur={() => (text.trim() ? add() : setOpen(false))} />
+          <input autoFocus list={listId} value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. fomo entry" onKeyDown={(e) => e.key === 'Escape' && setOpen(false)} onBlur={() => (text.trim() ? add() : setOpen(false))} />
           <datalist id={listId}>{suggestions.filter((s) => !values.includes(s)).map((s) => <option key={s} value={s} />)}</datalist>
         </form>
       ) : (

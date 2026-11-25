@@ -3,7 +3,8 @@ import type { Trade, TradeInput } from '../lib/types'
 import { insertTrades, updateTrade } from '../lib/trades'
 import { removeCharts, uploadChart } from '../lib/charts'
 import { ChartPicker, type PendingChart } from './Charts'
-import { fromLocalInput, parseTags, toLocalInput } from '../lib/format'
+import { fromLocalInput, toLocalInput } from '../lib/format'
+import { useTradingTools } from '../lib/settings'
 
 interface Props {
   trade?: Trade // when present we're editing
@@ -13,6 +14,7 @@ interface Props {
 
 const num = (v: string) => (v.trim() === '' ? null : Number(v))
 const str = (v: number | null | undefined) => (v === null || v === undefined ? '' : String(v))
+const MULTI = '\u0000multi' // older trades with several setup tags keep them until one is picked
 
 export function TradeForm({ trade, onDone, onCancel }: Props) {
   const [f, setF] = useState({
@@ -27,8 +29,13 @@ export function TradeForm({ trade, onDone, onCancel }: Props) {
     opened_at: toLocalInput(trade?.opened_at ?? null),
     closed_at: toLocalInput(trade?.closed_at ?? null),
     notes: trade?.notes ?? '',
-    tags: (trade?.tags ?? []).join(', '),
+    setup: (trade?.tags?.length ?? 0) > 1 ? MULTI : (trade?.tags?.[0] ?? ''),
   })
+  const tools = useTradingTools()
+  const setupOptions = [...new Set([
+    ...tools.labels.filter((l) => l.kind === 'setup').map((l) => l.name),
+    ...((trade?.tags?.length ?? 0) === 1 ? trade!.tags! : []),
+  ])].sort((a, b) => a.localeCompare(b))
   const [savedCharts, setSavedCharts] = useState<string[]>(trade?.charts ?? [])
   const [pending, setPending] = useState<PendingChart[]>([])
   const [busy, setBusy] = useState(false)
@@ -65,7 +72,7 @@ export function TradeForm({ trade, onDone, onCancel }: Props) {
       opened_at: fromLocalInput(f.opened_at),
       closed_at: fromLocalInput(f.closed_at),
       notes: f.notes.trim() || null,
-      tags: parseTags(f.tags),
+      tags: f.setup === MULTI ? (trade?.tags ?? []) : f.setup ? [f.setup] : [],
     }
     const uploaded: string[] = []
     try {
@@ -117,8 +124,12 @@ export function TradeForm({ trade, onDone, onCancel }: Props) {
           <label>Opened<input type="datetime-local" value={f.opened_at} onChange={set('opened_at')} /></label>
           <label>Closed<input type="datetime-local" value={f.closed_at} onChange={set('closed_at')} /></label>
           <label className="wide">
-            Tags (comma separated)
-            <input value={f.tags} onChange={set('tags')} placeholder="breakout, a+ setup" />
+            Setup
+            <select value={f.setup} onChange={set('setup')}>
+              {(trade?.tags?.length ?? 0) > 1 && <option value={MULTI}>Multiple: {(trade?.tags ?? []).join(', ')} (kept)</option>}
+              <option value="">No setup</option>
+              {setupOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
           </label>
           <label className="wide">Notes<textarea rows={4} value={f.notes} onChange={set('notes')} /></label>
           <ChartPicker

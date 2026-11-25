@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { configMissing, supabase } from './lib/supabase'
 import { fetchTrades } from './lib/trades'
@@ -46,13 +46,17 @@ export default function App() {
     return () => data.subscription.unsubscribe()
   }, [])
 
+  // Only the newest fetch may update state, so a slow older response can't overwrite a newer one.
+  const loadSeq = useRef(0)
   const reload = useCallback(() => {
+    const seq = ++loadSeq.current
     fetchTrades()
       .then((t) => {
+        if (seq !== loadSeq.current) return
         setTrades(t)
         setLoadError('')
       })
-      .catch((e: Error) => setLoadError(e.message))
+      .catch((e: Error) => { if (seq === loadSeq.current) setLoadError(e.message) })
   }, [])
 
   // Load trades whenever a user signs in.

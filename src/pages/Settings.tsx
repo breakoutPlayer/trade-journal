@@ -1,12 +1,14 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { Fragment, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import type { Trade } from '../lib/types'
 import { accountOf, addTransfer, deleteTransfer, saveBalance, transferTotals, useAccountBalances } from '../lib/accounts'
 import { netPnl } from '../lib/trades'
 import {
   COLORS, addCategory, addLabel, changeCategoryTag, customTag, deleteCategory, deleteLabel, deleteStrategy,
-  friendlyNameError, saveCategory, saveLabel, saveStrategy, setCategoryTags, useTradingTools,
+  RULES_MIGRATION_MSG, friendlyNameError, saveCategory, saveLabel, saveSetupRules, saveStrategy, setCategoryTags, useTradingTools,
   type Label, type LabelKind, type Strategy, type TagCategory,
 } from '../lib/settings'
+import { newRuleId } from '../lib/rules'
+import type { Rule } from '../lib/types'
 
 type Section = 'accounts' | 'setups' | 'mistakes' | 'tags' | 'strategies'
 const SECTIONS: [Section, string][] = [['accounts', 'Accounts'], ['setups', 'Setups'], ['mistakes', 'Mistakes'], ['tags', 'Custom Tags'], ['strategies', 'My Strategies']]
@@ -37,7 +39,7 @@ export function Settings({ trades, reload }: Props) {
         <h1>{SECTIONS.find(([id]) => id === section)![1]}</h1>
         {tools.error && <div className="panel error">{tools.error}</div>}
         {section === 'accounts' && <Accounts trades={trades} />}
-        {section === 'setups' && <LabelList kind="setup" labels={tools.labels} trades={trades} refresh={refresh} />}
+        {section === 'setups' && <LabelList kind="setup" labels={tools.labels} trades={trades} refresh={refresh} rulesMissing={tools.rulesMissing} />}
         {section === 'mistakes' && <LabelList kind="mistake" labels={tools.labels} trades={trades} refresh={refresh} />}
         {section === 'tags' && <Categories categories={tools.categories} trades={trades} refresh={refresh} />}
         {section === 'strategies' && <Strategies strategies={tools.strategies} trades={trades} refresh={refresh} />}
@@ -238,9 +240,10 @@ function TransferForm({ accounts, busy, onSave, onCancel }: {
 
 // ---------- setups & mistakes ----------
 
-function LabelList({ kind, labels, trades, refresh }: { kind: LabelKind; labels: Label[]; trades: Trade[]; refresh: () => void }) {
+function LabelList({ kind, labels, trades, refresh, rulesMissing = false }: { kind: LabelKind; labels: Label[]; trades: Trade[]; refresh: () => void; rulesMissing?: boolean }) {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
+  const [rulesOf, setRulesOf] = useState<string | null>(null)
   const act = useAction()
   const word = kind === 'setup' ? 'setup' : 'mistake'
 
@@ -252,12 +255,13 @@ function LabelList({ kind, labels, trades, refresh }: { kind: LabelKind; labels:
     const names = new Set([...defined.map((l) => l.name), ...counts.keys()])
     return [...names].sort((a, b) => a.localeCompare(b)).map((name) => {
       const l = defined.find((x) => x.name === name)
-      return { name, id: l?.id, color: l?.color ?? '#94a3b8', count: counts.get(name) ?? 0 }
+      return { name, id: l?.id, color: l?.color ?? '#94a3b8', count: counts.get(name) ?? 0, bias: l?.bias_rules ?? [], entry: l?.entry_rules ?? [] }
     })
   }, [labels, trades, kind])
 
   const remove = async (r: (typeof rows)[number]) => {
-    const msg = r.count ? `Delete "${r.name}"? It will be removed from ${r.count} trade(s).` : `Delete "${r.name}"?`
+    const reviews = kind === 'setup' && r.count ? ' Their trading rules reviews are removed too.' : ''
+    const msg = r.count ? `Delete "${r.name}"? It will be removed from ${r.count} trade(s).${reviews}` : `Delete "${r.name}"?`
     if (!confirm(msg)) return
     if (await act.run(() => deleteLabel(kind, r.name, r.id))) refresh()
   }
@@ -266,6 +270,7 @@ function LabelList({ kind, labels, trades, refresh }: { kind: LabelKind; labels:
     <>
       <Header onAdd={() => { setAdding(true); setEditing(null) }} adding={adding} />
       {act.error && <div className="panel error">{act.error}</div>}
+      {kind === 'setup' && rulesMissing && <div className="panel error">{RULES_MIGRATION_MSG}</div>}
       <div className="set-table">
         <div className="set-row set-th"><span>Name</span><span className="num">Trades</span><span /></div>
         {adding && (
@@ -282,17 +287,90 @@ function LabelList({ kind, labels, trades, refresh }: { kind: LabelKind; labels:
               if (await act.run(() => saveLabel(kind, r.name, name, color, r.id))) { setEditing(null); refresh() }
             }} />
         ) : (
-          <div key={r.name} className="set-row">
-            <span className="set-name"><Dot color={r.color} />{r.name}{!r.id && <span className="muted set-hint">used on trades</span>}</span>
+          <Fragment key={r.name}>
+          <div className="set-row">
+            <span className="set-name">
+              <Dot color={r.color} />{r.name}{!r.id && <span className="muted set-hint">used on trades</span>}
+              {kind === 'setup' && !rulesMissing && (
+                <button className="chip-btn set-rules-btn" aria-expanded={rulesOf === r.name} onClick={() => setRulesOf(rulesOf === r.name ? null : r.name)}>
+                  Rules ({r.bias.length + r.entry.length})
+                </button>
+              )}
+            </span>
             <span className="num">{r.count}</span>
             <span className="set-actions">
               <button className="link-muted" onClick={() => { setEditing(r.name); setAdding(false) }} aria-label={`Edit ${r.name}`} title="Edit">✎</button>
               <button className="link-muted" onClick={() => remove(r)} aria-label={`Delete ${r.name}`} title="Delete">🗑</button>
             </span>
           </div>
+          {kind === 'setup' && rulesOf === r.name && (
+            <RulesEditor key={`${r.id}-${r.name}`} bias={r.bias} entry={r.entry} busy={act.busy}
+              onCancel={() => setRulesOf(null)}
+              onSave={async (bias, entry) => { if (await act.run(() => saveSetupRules(r, bias, entry))) { setRulesOf(null); refresh() } }} />
+          )}
+          </Fragment>
         ))}
       </div>
     </>
+  )
+}
+
+/** Bias and Entry rule lists for one setup: add, reword, delete, reorder. Saved with the Save button. */
+function RulesEditor({ bias, entry, busy, onSave, onCancel }: {
+  bias: Rule[]; entry: Rule[]; busy: boolean; onSave: (bias: Rule[], entry: Rule[]) => void; onCancel: () => void
+}) {
+  const [lists, setLists] = useState({ bias, entry })
+  const blank = (l: Rule[]) => l.some((r) => !r.text.trim())
+  return (
+    <div className="rules-editor">
+      <div className="rules-cols">
+        <RuleColumn title="Bias" hint="e.g. Higher timeframe in uptrend" rules={lists.bias} onChange={(b) => setLists((x) => ({ ...x, bias: b }))} />
+        <RuleColumn title="Entry" hint="e.g. Candle closes above level" rules={lists.entry} onChange={(e) => setLists((x) => ({ ...x, entry: e }))} />
+      </div>
+      <div className="row">
+        <span className="muted fs-12">Trades already marked reviewed keep the rules they were reviewed with.</span>
+        <span className="spacer" />
+        <button type="button" className="chip-btn" onClick={onCancel}>Cancel</button>
+        <button type="button" className="primary" disabled={busy || blank(lists.bias) || blank(lists.entry)} onClick={() => onSave(lists.bias, lists.entry)}>{busy ? 'Saving…' : 'Save rules'}</button>
+      </div>
+    </div>
+  )
+}
+
+function RuleColumn({ title, hint, rules, onChange }: { title: string; hint: string; rules: Rule[]; onChange: (r: Rule[]) => void }) {
+  const [text, setText] = useState('')
+  // Also adds on blur, so a typed rule isn't lost when Save is clicked without pressing Add.
+  const add = (e?: FormEvent) => {
+    e?.preventDefault()
+    if (text.trim()) onChange([...rules, { id: newRuleId(), text: text.trim() }])
+    setText('')
+  }
+  const move = (i: number, d: number) => {
+    const next = [...rules]
+    const tmp = next[i]
+    next[i] = next[i + d]
+    next[i + d] = tmp
+    onChange(next)
+  }
+  return (
+    <div className="rules-col">
+      <span className="label">{title}</span>
+      {rules.length === 0 && <p className="muted fs-12 m-0">No {title.toLowerCase()} rules yet.</p>}
+      <ol className="rules-list">
+        {rules.map((r, i) => (
+          <li key={r.id}>
+            <input value={r.text} maxLength={200} aria-label={`${title} rule ${i + 1}`} onChange={(e) => onChange(rules.map((x) => (x.id === r.id ? { ...x, text: e.target.value } : x)))} />
+            <button type="button" className="link-muted" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up" title="Move up">↑</button>
+            <button type="button" className="link-muted" disabled={i === rules.length - 1} onClick={() => move(i, 1)} aria-label="Move down" title="Move down">↓</button>
+            <button type="button" className="link-muted" onClick={() => onChange(rules.filter((x) => x.id !== r.id))} aria-label="Delete rule" title="Delete">✕</button>
+          </li>
+        ))}
+      </ol>
+      <form className="rules-add" onSubmit={add}>
+        <input value={text} maxLength={200} placeholder={hint} onChange={(e) => setText(e.target.value)} onBlur={() => add()} aria-label={`New ${title.toLowerCase()} rule`} />
+        <button className="chip-btn" disabled={!text.trim()}>Add</button>
+      </form>
+    </div>
   )
 }
 

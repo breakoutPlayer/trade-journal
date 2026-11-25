@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { useTradingTools } from '../lib/settings'
+import { ruleStatus, type RuleStatus } from '../lib/rules'
 import type { Trade } from '../lib/types'
 import { deleteTrade, netPnl, tradeReturn, tradeStatus } from '../lib/trades'
 import { fmtMoney, fmtNum, fmtPct, pnlClass } from '../lib/format'
@@ -25,7 +27,9 @@ export function TradeLog({ trades, reload, openId, setOpenId }: Props) {
   const [mistake, setMistake] = useState('')
   const [side, setSide] = useState('')
   const [account, setAccount] = useState('')
+  const [review, setReview] = useState<'' | 'todo' | 'followed' | 'broken'>('')
   const [asc, setAsc] = useState(false)
+  const { labels } = useTradingTools()
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const allSetups = useMemo(() => [...new Set(trades.flatMap((t) => t.tags ?? []))].sort(), [trades])
@@ -43,19 +47,27 @@ export function TradeLog({ trades, reload, openId, setOpenId }: Props) {
         (!account || accountKey(t) === account) &&
         (!setup || (t.tags ?? []).includes(setup)) &&
         (!mistake || (t.mistakes ?? []).includes(mistake)) &&
-        (!side || t.side === side)
+        (!side || t.side === side) &&
+        (!review || reviewMatch(ruleStatus(t, labels), review))
       )
     })
     return list.sort((a, b) => (asc ? openTime(a) - openTime(b) : openTime(b) - openTime(a)))
-  }, [trades, q, setup, mistake, side, account, asc])
+  }, [trades, q, setup, mistake, side, account, review, labels, asc])
 
   const s = useMemo(() => summarize(shown), [shown])
-  const filtered = Boolean(q || setup || mistake || side || account)
-  const clearAll = () => { setSearch(''); setSetup(''); setMistake(''); setSide(''); setAccount('') }
+  const filtered = Boolean(q || setup || mistake || side || account || review)
+  const clearAll = () => { setSearch(''); setSetup(''); setMistake(''); setSide(''); setAccount(''); setReview('') }
+
+  // Prev/next follow the list as it was when the trade was opened, so a trade that stops
+  // matching the filters (e.g. marked reviewed under "Not reviewed") keeps its place.
+  const [nav, setNav] = useState<string[] | null>(null)
+  if (openId && !nav) setNav(shown.map((t) => t.id))
+  if (!openId && nav) setNav(null)
 
   const opened = openId ? trades.find((t) => t.id === openId) : undefined
   if (opened) {
-    const i = shown.findIndex((t) => t.id === opened.id)
+    const order = nav?.includes(opened.id) ? nav.filter((id) => trades.some((t) => t.id === id)) : shown.map((t) => t.id)
+    const i = order.indexOf(opened.id)
     return (
       <>
         <TradeDetail
@@ -66,8 +78,8 @@ export function TradeLog({ trades, reload, openId, setOpenId }: Props) {
           onBack={() => setOpenId(null)}
           onEdit={() => setEditing(opened)}
           onDeleted={() => { setOpenId(null); reload() }}
-          prev={i > 0 ? () => setOpenId(shown[i - 1].id) : undefined}
-          next={i >= 0 && i < shown.length - 1 ? () => setOpenId(shown[i + 1].id) : undefined}
+          prev={i > 0 ? () => setOpenId(order[i - 1]) : undefined}
+          next={i >= 0 && i < order.length - 1 ? () => setOpenId(order[i + 1]) : undefined}
         />
         {editing && editing !== 'new' && (
           <TradeForm trade={editing} onCancel={() => setEditing(null)} onDone={() => { setEditing(null); reload() }} />
@@ -123,6 +135,12 @@ export function TradeLog({ trades, reload, openId, setOpenId }: Props) {
           <option value="long">Long</option>
           <option value="short">Short</option>
         </select>
+        <select className="range-select" value={review} onChange={(e) => setReview(e.target.value as typeof review)} aria-label="Rules review">
+          <option value="">All reviews</option>
+          <option value="todo">Not reviewed</option>
+          <option value="followed">Rules followed</option>
+          <option value="broken">Rules not followed</option>
+        </select>
         {allAccounts.length > 1 && (
           <select className="range-select" value={account} onChange={(e) => setAccount(e.target.value)} aria-label="Account">
             <option value="">All accounts</option>
@@ -168,6 +186,7 @@ export function TradeLog({ trades, reload, openId, setOpenId }: Props) {
                 <th>Side</th>
                 <th>Setups</th>
                 <th>Mistakes</th>
+                <th>Rules</th>
               </tr>
             </thead>
             <tbody>
@@ -191,6 +210,7 @@ export function TradeLog({ trades, reload, openId, setOpenId }: Props) {
                     <td className="c-side"><span className={`side-badge ${t.side === 'short' ? 'short' : 'long'}`}>{t.side ? t.side[0].toUpperCase() : '–'}</span></td>
                     <td className={`c-setups ${(t.tags ?? []).length ? '' : 'c-empty'}`}>{(t.tags ?? []).map((g) => <span key={g} className="chip setup">{g}</span>)}</td>
                     <td className={`c-mistakes ${(t.mistakes ?? []).length ? '' : 'c-empty'}`}>{(t.mistakes ?? []).map((g) => <span key={g} className="chip mistake">{g}</span>)}</td>
+                    <RulesCell status={ruleStatus(t, labels)} />
                   </tr>
                 )
               })}
@@ -218,4 +238,24 @@ export function TradeLog({ trades, reload, openId, setOpenId }: Props) {
       )}
     </div>
   )
+}
+
+/** "Not reviewed" also lists trades without a setup, so fresh imports show up there. */
+function reviewMatch(s: RuleStatus, f: 'todo' | 'followed' | 'broken') {
+  if (f === 'todo') return s.kind === 'pending' || s.kind === 'no-setup'
+  return s.kind === 'reviewed' && s.followed === (f === 'followed')
+}
+
+function RulesCell({ status: s }: { status: RuleStatus }) {
+  if (s.kind === 'reviewed') {
+    return (
+      <td className="c-rules">
+        <span className={`tbadge ${s.followed ? 'pos-soft' : 'neg-soft'}`} title={s.followed ? 'Rules followed' : 'Rules not followed'}>
+          {s.followed ? '✓' : '✕'} {s.done}/{s.total}
+        </span>
+      </td>
+    )
+  }
+  const text = s.kind === 'pending' ? 'Not reviewed' : s.kind === 'no-rules' ? 'No rules' : 'No setup'
+  return <td className={`c-rules muted ${s.kind === 'pending' ? '' : 'c-empty'}`}>{text}</td>
 }

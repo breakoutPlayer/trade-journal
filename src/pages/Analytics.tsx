@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import type { Trade } from '../lib/types'
 import { groupStats, summarize } from '../lib/stats'
-import { netPnl, tradeTime } from '../lib/trades'
+import { netPnl, tradeStatus, tradeTime } from '../lib/trades'
+import { useTradingTools } from '../lib/settings'
+import { isFollowed, isReviewed, reviewOf, setupLabel, tradeSetup } from '../lib/rules'
 import { fmtMoney, fmtPct, pnlClass } from '../lib/format'
 import { BREAKDOWNS, GROUPINGS, METRICS, REPORT_TABS, fmtMetric, metricSeries, orderRows, type Grouping, type ReportTab } from '../lib/reports'
 import { MetricChart } from '../components/MetricChart'
@@ -139,6 +141,106 @@ function Breakdown({ id, trades }: { id: string; trades: Trade[] }) {
   return <GroupTable title={`By ${b.label.toLowerCase()}`} label={b.label} rows={rows} />
 }
 
+const RULE_VIEWS: [string, string][] = [['rules-followed', 'Followed vs not'], ['rules-per-rule', 'Per rule']]
+
+/** Results of reviewed, closed trades: rules followed vs not, and per rule ticked vs missed. */
+function RulesReport({ trades, perRule }: { trades: Trade[]; perRule: boolean }) {
+  const { labels } = useTradingTools()
+  const [setup, setSetup] = useState('')
+
+  const closed = useMemo(() => trades.filter((t) => tradeStatus(t) !== 'OPEN' && tradeSetup(t)), [trades])
+  const pool = useMemo(() => (setup ? closed.filter((t) => tradeSetup(t) === setup) : closed), [closed, setup])
+  const reviewed = useMemo(() => pool.filter(isReviewed), [pool])
+  const setups = useMemo(() => [...new Set([
+    ...closed.filter(isReviewed).map((t) => tradeSetup(t)!),
+    ...labels.filter((l) => l.kind === 'setup' && (l.bias_rules?.length || l.entry_rules?.length)).map((l) => l.name),
+  ])].sort((a, b) => a.localeCompare(b)), [closed, labels])
+
+  const followedRows = useMemo(() => {
+    const rows = groupStats(reviewed, (t) => [isFollowed(reviewOf(t)!) ? 'Followed' : 'Not followed'])
+    const rank = (k: string) => (k === 'Followed' ? 0 : 1)
+    return rows.sort((a, b) => rank(a.key) - rank(b.key)).map((r) => ({ ...r, label: r.key }))
+  }, [reviewed])
+
+  const ruleRows = useMemo(() => {
+    if (!setup) return []
+    const label = setupLabel(labels, setup)
+    const rules = new Map<string, { group: string; text: string; hit: Trade[]; miss: Trade[] }>()
+    const add = (group: string, id: string, text: string) => {
+      if (!rules.has(id)) rules.set(id, { group, text, hit: [], miss: [] })
+      return rules.get(id)!
+    }
+    // Current rules first, in Settings order and wording; then rules that were since removed.
+    for (const r of label?.bias_rules ?? []) add('Bias', r.id, r.text)
+    for (const r of label?.entry_rules ?? []) add('Entry', r.id, r.text)
+    for (const t of reviewed) {
+      const rv = reviewOf(t)!
+      for (const [group, list] of [['Bias', rv.bias], ['Entry', rv.entry]] as const) {
+        for (const r of list) (r.ok ? add(group, r.id, r.text).hit : add(group, r.id, r.text).miss).push(t)
+      }
+    }
+    return [...rules.entries()].map(([id, r]) => ({ id, ...r, hitS: summarize(r.hit), missS: summarize(r.miss) }))
+  }, [setup, labels, reviewed])
+
+  const cell = (s: ReturnType<typeof summarize>) => (
+    <>
+      <td className="num">{s.count}</td>
+      <td className="num">{s.count ? fmtPct(s.winRate) : '—'}</td>
+      <td className={`num ${pnlClass(s.net)}`}>{s.count ? fmtMoney(s.net / s.count) : '—'}</td>
+    </>
+  )
+
+  return (
+    <>
+      <div className="row mb-16">
+        <select className="range-select" value={setup} onChange={(e) => setSetup(e.target.value)} aria-label="Setup">
+          <option value="">{perRule ? 'Pick a setup' : 'All setups'}</option>
+          {setups.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <span className="muted fs-13">{reviewed.length} reviewed of {pool.length} closed trades{setup ? ` with “${setup}”` : ' with a setup'}.</span>
+      </div>
+      {!perRule ? (
+        <>
+          <p className="mt-0">Followed means every Bias and Entry rule was ticked. Only trades marked reviewed count.</p>
+          <GroupTable title="Rules followed vs not" label="Rules" rows={followedRows} />
+        </>
+      ) : !setup ? (
+        <div className="panel"><p className="m-0">Pick a setup to see how each of its rules relates to results.</p></div>
+      ) : (
+        <div className="panel">
+          <h3>Per rule: {setup}</h3>
+          {ruleRows.length === 0 ? <p>This setup has no rules yet.</p> : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th rowSpan={2}>Rule</th>
+                    <th colSpan={3} className="num">Ticked</th>
+                    <th colSpan={3} className="num">Missed</th>
+                  </tr>
+                  <tr>
+                    <th className="num">Trades</th><th className="num">Win rate</th><th className="num">Avg / trade</th>
+                    <th className="num">Trades</th><th className="num">Win rate</th><th className="num">Avg / trade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ruleRows.map((r) => (
+                    <tr key={r.id}>
+                      <td><span className="muted fs-12">{r.group}</span> {r.text}</td>
+                      {cell(r.hitS)}
+                      {cell(r.missS)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
 export function Analytics({ trades }: { trades: Trade[] }) {
   const [view, setView] = useState('overview')
   const groups = ['Trade', 'Tags']
@@ -150,6 +252,10 @@ export function Analytics({ trades }: { trades: Trade[] }) {
         <h2>Reports</h2>
         <div className="rep-group">Performance</div>
         <button className={view === 'overview' ? 'active' : ''} onClick={() => setView('overview')}>Overview</button>
+        <div className="rep-group">Trading rules</div>
+        {RULE_VIEWS.map(([id, label]) => (
+          <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>{label}</button>
+        ))}
         {groups.map((g) => (
           <div key={g}>
             <div className="rep-group">{g}</div>
@@ -162,6 +268,8 @@ export function Analytics({ trades }: { trades: Trade[] }) {
       <div className="rep-body">
         {!s.count ? (
           <div className="panel"><p>No trades yet. Head to Import or Trades to add some.</p></div>
+        ) : view.startsWith('rules-') ? (
+          <RulesReport trades={trades} perRule={view === 'rules-per-rule'} />
         ) : view === 'overview' ? (
           <Overview trades={trades} />
         ) : (

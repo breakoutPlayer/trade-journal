@@ -57,6 +57,7 @@ export function tradeStatus(t: Trade): TradeStatus {
 /** Turns "column does not exist" errors for the newer columns into a pointer at the README SQL. */
 export function friendlySaveError(err: unknown) {
   const msg = (err as Error)?.message ?? String(err)
+  if (/rule_review/.test(msg) && /column|schema cache/i.test(msg)) return 'Trading rules need a database update. Run supabase/migrations/20261126000000_setup_rules.sql.'
   return /mistakes|targets|stops/.test(msg) && /column|schema cache/i.test(msg)
     ? 'Your trades table is missing the mistakes/targets/stops columns. Run the SQL under "Trade details" in the README once in the Supabase SQL Editor.'
     : msg

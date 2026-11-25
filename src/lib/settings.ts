@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import type { Rule } from './types'
 
 // Settings → Trading Tools & Strategies. See supabase/migrations/20261123000000_trading_tools.sql.
 
 export type LabelKind = 'setup' | 'mistake'
 
-export interface Label { id: string; kind: LabelKind; name: string; color: string }
+export interface Label { id: string; kind: LabelKind; name: string; color: string; bias_rules?: Rule[]; entry_rules?: Rule[] }
 export interface TagCategory { id: string; name: string; color: string; tags: string[] }
 export interface Strategy { id: string; name: string; description: string | null; rules: string[]; color: string }
 
@@ -26,10 +27,18 @@ export function useTradingTools() {
   const [strategies, setStrategies] = useState<Strategy[]>([])
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
+  // True until supabase/migrations/20261126000000_setup_rules.sql has been run.
+  const [rulesMissing, setRulesMissing] = useState(false)
 
   const reload = useCallback(() => {
+    const labels = async () => {
+      const res = await supabase.from('trade_labels').select('id,kind,name,color,bias_rules,entry_rules').order('name')
+      const missing = Boolean(res.error && /bias_rules|entry_rules/.test(res.error.message))
+      setRulesMissing(missing)
+      return missing ? supabase.from('trade_labels').select('id,kind,name,color').order('name') : res
+    }
     Promise.all([
-      supabase.from('trade_labels').select('id,kind,name,color').order('name'),
+      labels(),
       supabase.from('tag_categories').select('id,name,color,tags').order('name'),
       supabase.from('strategies').select('id,name,description,rules,color').order('name'),
     ])
@@ -46,7 +55,7 @@ export function useTradingTools() {
   }, [])
   useEffect(reload, [reload])
 
-  return { labels, categories, strategies, error, loaded, reload }
+  return { labels, categories, strategies, error, loaded, rulesMissing, reload }
 }
 
 // ---------- setups & mistakes ----------
@@ -72,6 +81,16 @@ export async function deleteLabel(kind: LabelKind, name: string, id?: string) {
 async function renameOnTrades(col: 'tags' | 'mistakes' | 'custom_tags', oldValue: string, newValue: string | null) {
   check(await supabase.rpc('rename_trade_value', { col, old_value: oldValue, new_value: newValue }))
 }
+
+/** Saves a setup's Bias and Entry rules, creating the setup definition if it was only used on trades. */
+export async function saveSetupRules(setup: { id?: string; name: string; color: string }, bias: Rule[], entry: Rule[]) {
+  const clean = (list: Rule[]) => list.map((r) => ({ id: r.id, text: r.text.trim() })).filter((r) => r.text)
+  const rules = { bias_rules: clean(bias), entry_rules: clean(entry) }
+  if (setup.id) check(await supabase.from('trade_labels').update(rules).eq('id', setup.id))
+  else check(await supabase.from('trade_labels').upsert({ kind: 'setup', name: setup.name, color: setup.color, ...rules }, { onConflict: 'user_id,kind,name' }))
+}
+
+export const RULES_MIGRATION_MSG = 'Trading rules need a database update. Run supabase/migrations/20261126000000_setup_rules.sql.'
 
 // ---------- custom tag categories ----------
 
@@ -118,5 +137,6 @@ export function friendlyNameError(err: unknown) {
   const msg = (err as Error)?.message ?? String(err)
   if (/duplicate key|unique/i.test(msg)) return 'That name already exists.'
   if (/check constraint/i.test(msg)) return 'Name is empty, too long, or contains ":".'
+  if (/bias_rules|entry_rules/.test(msg)) return RULES_MIGRATION_MSG
   return msg
 }

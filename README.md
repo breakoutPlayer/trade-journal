@@ -53,6 +53,12 @@ alter table trades add column if not exists stops numeric[] not null default '{}
 
 Note templates ("Save as new template" in the Notes tab) are kept in your browser, not in Supabase.
 
+### Trading rules
+
+Each setup can have a Bias checklist and an Entry checklist (Settings → Setups → Rules). On a trade's Overview tab, pick its setup, tick the rules you followed and press **Mark reviewed**. A reviewed trade keeps the rules it was reviewed with, so editing rules later doesn't change old scores. "Followed" means every rule was ticked. The Trades list shows each trade's score and can filter to trades not yet reviewed, and Reports → Trading rules compares results when rules were followed or not, overall and per rule.
+
+This needs `supabase/migrations/20261126000000_setup_rules.sql` (`npx supabase db push`, or paste it into the SQL Editor).
+
 ## Journal
 
 The Journal page has Daily notes (one per trading day, shown with that day's stats and trades), Trade notes (every trade that has notes) and General notes. Daily and general notes live in their own table. Run this once in the SQL Editor:

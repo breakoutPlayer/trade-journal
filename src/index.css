@@ -625,6 +625,28 @@ main:has(> .td) { max-width: none; }
 .td-rules { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; font-size: 13px; }
 .td-rules label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
 .td-rules input { width: auto; margin-top: 2px; }
+/* Trading rules: checklist on the trade, editor in Settings → Setups */
+.rules { display: grid; gap: 12px; }
+.rules > .range-select { justify-self: start; max-width: 100%; }
+.rules-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.rules-two .label, .rules-col .label { display: flex; align-items: baseline; gap: 8px; font-size: 12px; color: var(--muted); }
+.rules-score { font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
+.rules-note, .rules-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.set-name .set-rules-btn { margin-left: auto; font-size: 12px; padding: 2px 8px; }
+.rules-editor { display: grid; gap: 12px; padding: 12px 16px 16px; border-top: 1px solid var(--line); background: var(--panel-2); }
+.rules-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.rules-col { display: grid; gap: 8px; align-content: start; }
+.rules-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rules-list li { display: flex; align-items: center; gap: 4px; }
+.rules-list input { flex: 1 1 auto; min-width: 0; padding: 4px 8px; font-size: 13px; }
+.rules-list .link-muted { padding: 2px 4px; }
+.rules-list .link-muted:disabled { opacity: 0.3; cursor: default; }
+.rules-add { display: flex; gap: 8px; }
+.rules-add input { flex: 1 1 auto; min-width: 0; padding: 4px 8px; font-size: 13px; }
+@media (max-width: 720px) {
+  .rules-two, .rules-cols { grid-template-columns: minmax(0, 1fr); }
+  .tl-table .c-rules { grid-column: 2 / -1; }
+}
 .ctag-group { display: grid; gap: 8px; margin-bottom: 12px; }
 .ctag-group .label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
 .chip.toggle { cursor: pointer; background: transparent; border: 1px solid var(--line); color: var(--muted); text-transform: none; font-size: 12px; }

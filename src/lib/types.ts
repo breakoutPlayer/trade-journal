@@ -25,7 +25,21 @@ export interface Trade {
   // Settings → Trading Tools (see supabase/migrations/20261123000000_trading_tools.sql)
   custom_tags?: string[] | null // "Category: tag"
   strategy_id?: string | null
+  // Trading rules review (see supabase/migrations/20261126000000_setup_rules.sql)
+  rule_review?: RuleReview | null
   created_at: string
+}
+
+/** One rule of a setup's Bias or Entry checklist. The id keeps stats together after rewording. */
+export interface Rule { id: string; text: string }
+export interface TickedRule extends Rule { ok: boolean }
+
+/** A trade's checklist for its setup. Once reviewed, it keeps this copy of the rules. */
+export interface RuleReview {
+  setup: string
+  bias: TickedRule[]
+  entry: TickedRule[]
+  reviewed_at: string | null
 }
 
 // What we send when creating/updating. id, user_id and created_at are filled by the database.
