@@ -350,7 +350,7 @@ td.notes { white-space: normal; max-width: 260px; color: var(--muted); }
   .reports { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .rep-nav { position: static; display: flex; flex-wrap: nowrap; overflow-x: auto; max-height: none; gap: 4px; align-items: center; scrollbar-width: none; }
   .rep-nav::-webkit-scrollbar { display: none; }
-  .rep-nav h2, .rep-group { display: none; }
+  .rep-nav h2, .rep-nav .rep-group { display: none; }
   .rep-nav > div { display: contents; }
   .rep-nav button { flex: none; }
   .rep-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -643,6 +643,7 @@ main:has(> .td) { max-width: none; }
 .rules-list .link-muted:disabled { opacity: 0.3; cursor: default; }
 .rules-add { display: flex; gap: 8px; }
 .rules-add input { flex: 1 1 auto; min-width: 0; padding: 4px 8px; font-size: 13px; }
+td.rule-cell { white-space: normal; min-width: 96px; }
 @media (max-width: 720px) {
   .rules-two, .rules-cols { grid-template-columns: minmax(0, 1fr); }
   .tl-table .c-rules { grid-column: 2 / -1; }

@@ -186,7 +186,7 @@ function RulesReport({ trades, perRule }: { trades: Trade[]; perRule: boolean })
     <>
       <td className="num">{s.count}</td>
       <td className="num">{s.count ? fmtPct(s.winRate) : '—'}</td>
-      <td className={`num ${pnlClass(s.net)}`}>{s.count ? fmtMoney(s.net / s.count) : '—'}</td>
+      <td className={`num hide-sm ${pnlClass(s.net)}`}>{s.count ? fmtMoney(s.net / s.count) : '—'}</td>
     </>
   )
 
@@ -209,24 +209,21 @@ function RulesReport({ trades, perRule }: { trades: Trade[]; perRule: boolean })
       ) : (
         <div className="panel">
           <h3>Per rule: {setup}</h3>
+          <p className="muted fs-12 mt-0">✓ = rule ticked, ✕ = rule missed.</p>
           {ruleRows.length === 0 ? <p>This setup has no rules yet.</p> : (
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th rowSpan={2}>Rule</th>
-                    <th colSpan={3} className="num">Ticked</th>
-                    <th colSpan={3} className="num">Missed</th>
-                  </tr>
-                  <tr>
-                    <th className="num">Trades</th><th className="num">Win rate</th><th className="num">Avg / trade</th>
-                    <th className="num">Trades</th><th className="num">Win rate</th><th className="num">Avg / trade</th>
+                    <th>Rule</th>
+                    <th className="num">✓ Trades</th><th className="num">✓ Win rate</th><th className="num hide-sm">✓ Avg / trade</th>
+                    <th className="num">✕ Trades</th><th className="num">✕ Win rate</th><th className="num hide-sm">✕ Avg / trade</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ruleRows.map((r) => (
                     <tr key={r.id}>
-                      <td><span className="muted fs-12">{r.group}</span> {r.text}</td>
+                      <td className="rule-cell"><span className="muted fs-12">{r.group}</span> {r.text}</td>
                       {cell(r.hitS)}
                       {cell(r.missS)}
                     </tr>
