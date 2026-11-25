@@ -3,7 +3,7 @@ import type { Trade } from '../lib/types'
 import { accountOf, balanceBasis, useAccountBalances } from '../lib/accounts'
 import { groupStats, summarize } from '../lib/stats'
 import { dayKey, tradeTime } from '../lib/trades'
-import { fmtMoney, fmtMoneyShort, fmtPct, pnlClass } from '../lib/format'
+import { fmtMoney, fmtMoneyShort, fmtPct, fmtUsd, pnlClass } from '../lib/format'
 import {
   currentStreak, drawdownStats, holdTimePnl, hourlyPnl, monthlyPnl,
   volumeBySymbol, weekdayPnl, weekStart, changePctBuckets, yearMonths,
@@ -271,7 +271,7 @@ export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
                 <dd>{(Math.abs(risk.dd.pct) * 100).toFixed(2)}% <span className={`badge ${Math.abs(risk.dd.pct) > 0.1 ? 'neg' : 'pos'}`}>{Math.abs(risk.dd.pct) > 0.1 ? 'CAUTION' : 'SAFE'}</span></dd>
               ) : (
                 <dd title="Set a starting balance for every account in Settings → Accounts to see this as a % with a SAFE / CAUTION rating.">
-                  <span className={risk.dd.amount < 0 ? 'loss' : ''}>{fmtMoney(risk.dd.amount, false)}</span> <span className="muted fs-12">no balance set</span>
+                  <span className={risk.dd.amount < 0 ? 'loss' : ''}>{fmtUsd(risk.dd.amount)}</span> <span className="muted fs-12">no balance set</span>
                 </dd>
               )}
             </dl>

@@ -48,3 +48,8 @@ export function fromLocalInput(v: string) {
 export function parseTags(s: string) {
   return [...new Set(s.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean))]
 }
+
+/** Dollars with the sign before the $, e.g. -$221.35 (same style as the dashboard drawdown cards). */
+export function fmtUsd(n: number) {
+  return `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
