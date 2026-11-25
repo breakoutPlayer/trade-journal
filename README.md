@@ -57,7 +57,7 @@ Note templates ("Save as new template" in the Notes tab) are kept in your browse
 
 Each setup can have a Bias checklist and an Entry checklist (Settings → Setups → Rules). On a trade's Overview tab, pick its setup, tick the rules you followed and press **Mark reviewed**. A reviewed trade keeps the rules it was reviewed with, so editing rules later doesn't change old scores. "Followed" means every rule was ticked. The Trades list shows each trade's score and can filter to trades not yet reviewed, and Reports → Trading rules compares results when rules were followed or not, overall and per rule.
 
-This needs `supabase/migrations/20261126000000_setup_rules.sql` (`npx supabase db push`, or paste it into the SQL Editor).
+This needs `supabase/migrations/20261126000000_setup_rules.sql` (`npx supabase db push --remote`, or paste it into the SQL Editor).
 
 ## Journal
 
@@ -112,7 +112,7 @@ The **Connections** tab pulls closed trades automatically (hourly, plus a "Sync 
    ```
    Optionally also `npx supabase secrets set ALLOWED_ORIGIN=https://<you>.github.io` to restrict which site may call the functions.
    Keep `ENCRYPTION_KEY` backed up somewhere private: if it's lost, re-add your connections.
-3. `npx supabase db push` (runs `supabase/migrations`). Or paste `20261122000000_exchange_sync.sql` into the SQL Editor.
+3. `npx supabase db push --remote` (runs `supabase/migrations` on your linked project; without `--remote` newer CLI versions target a local database). Or paste `20261122000000_exchange_sync.sql` into the SQL Editor.
 4. Deploy the functions (`sync` verifies the user itself so the hourly cron can call it):
    ```powershell
    npx supabase functions deploy connections
