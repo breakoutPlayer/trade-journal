@@ -79,14 +79,6 @@ export function currentStreak(trades: Trade[]): { kind: 'win' | 'loss' | 'none';
   return { kind, length }
 }
 
-/** How far the running total is below its all-time peak, as a % of that peak (0 if no peak yet). */
-export function currentDrawdownPct(curve: { equity: number }[]): number {
-  let peak = 0
-  for (const p of curve) peak = Math.max(peak, p.equity)
-  const last = curve.length ? curve[curve.length - 1].equity : 0
-  return peak > 0 ? ((peak - last) / peak) * 100 : 0
-}
-
 /** Monday 00:00 of the week containing d. */
 export function weekStart(d: Date) {
   const s = new Date(d.getFullYear(), d.getMonth(), d.getDate())
@@ -197,7 +189,7 @@ export function performanceScore(s: {
 
 export interface Drawdown {
   amount: number // <= 0, dollars below the prior equity peak
-  pct: number | null // amount / peak equity, when the peak is above 0
+  pct: number | null // amount / account balance at the peak; null when the account size is unknown
   date: Date | null
 }
 
@@ -208,7 +200,7 @@ export interface Drawdown {
  * - average: mean depth of all episodes, including one still in progress
  * - current: how far equity is below its high right now (date = latest trade)
  */
-export function drawdownStats(trades: Trade[], startBalance: number | null = null, transfers: { at: string; amount: number }[] = []): { max: Drawdown; average: Drawdown; current: Drawdown; episodes: number } {
+export function drawdownStats(trades: Trade[], startBalance: number | null = null, transfers: { at: string; amount: number }[] = []): { max: Drawdown; average: Drawdown; current: Drawdown; episodes: number; hasBalance: boolean } {
   const sorted = [...trades].sort((a, b) => tradeTime(a).getTime() - tradeTime(b).getTime())
   let equity = 0, peak = 0
   // Account balance at a point in time = starting balance + deposits/withdrawals so far + trading P&L.
@@ -216,10 +208,12 @@ export function drawdownStats(trades: Trade[], startBalance: number | null = nul
   const moves = [...transfers].map((t) => ({ at: Date.parse(t.at), amount: t.amount })).sort((a, b) => a.at - b.at)
   let mi = 0, deposited = 0
   let peakBase = startBalance ?? 0 // balance excluding P&L, at the time of the current equity peak
-  // With a balance: % of the account balance at the peak. Otherwise % of the P&L peak.
+  // % of the account balance at the peak. Without a known balance there is no honest %
+  // (a % of the P&L peak runs into the hundreds when the peak is small), so it is left out.
   const pctOf = (dd: number, pk: number, base = peakBase) => {
-    if (useBalance) { const bal = base + pk; return bal > 0 ? dd / bal : null }
-    return pk > 0 ? dd / pk : null
+    if (!useBalance) return null
+    const bal = base + pk
+    return bal > 0 ? dd / bal : null
   }
   let max: Drawdown = { amount: 0, pct: null, date: null }
   const episodes: { depth: number; peak: number; base: number }[] = []
@@ -249,5 +243,6 @@ export function drawdownStats(trades: Trade[], startBalance: number | null = nul
     average: { amount: avg, pct: episodes.length ? pctOf(avg, avgPeak, avgBase) : null, date: null },
     current: { amount: Math.min(0, equity - peak), pct: pctOf(Math.min(0, equity - peak), peak), date: last },
     episodes: episodes.length,
+    hasBalance: useBalance,
   }
 }

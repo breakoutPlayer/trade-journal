@@ -329,20 +329,23 @@ const pctBadge = (p: number | null) => (p == null ? null : <span className="dd-p
 /** Average and maximum drawdown cards (two grid cells). */
 export function DrawdownWidgets({ trades, startBalance = null, transfers = [] }: { trades: Trade[]; startBalance?: number | null; transfers?: { at: string; amount: number }[] }) {
   const dd = useMemo(() => drawdownStats(trades, startBalance, transfers), [trades, startBalance, transfers])
-  const tip = startBalance || transfers.length
+  const tip = dd.hasBalance
     ? `% is of the account balance at the peak (starting balance${transfers.length ? ' + deposits/withdrawals so far' : ''} + net P&L at that high).`
-    : '% is of the equity peak (cumulative net P&L at its high); hidden when that peak is $0 or less. Set a starting balance in Settings → Accounts to see % of balance.'
+    : 'Shown in $ only: set a starting balance for every account in Settings → Accounts to see % of balance.'
+  const noPct = !dd.hasBalance && <div className="dd-sub fs-12">Set starting balances in Settings → Accounts to see %.</div>
   return (
     <>
       <section className="widget span-1 dd-card">
         <h3 title={`Average depth of ${dd.episodes} drawdown(s): each runs from an equity high until it is regained. ${tip}`}>Average drawdown ⓘ</h3>
         <div className="dd-main"><b className={dd.average.amount < 0 ? 'loss' : ''}>{usd(dd.average.amount)}</b>{pctBadge(dd.average.pct)}</div>
         <div className="dd-sub">Current ({ddDate(dd.current.date)}): <span className={dd.current.amount < 0 ? 'loss' : 'win'}>{usd(dd.current.amount)}</span></div>
+        {noPct}
       </section>
       <section className="widget span-1 dd-card">
         <h3 title={`Largest drop from an equity high to a later low. ${tip}`}>Max drawdown ⓘ</h3>
         <div className="dd-main"><b className={dd.max.amount < 0 ? 'loss' : ''}>{usd(dd.max.amount)}</b>{pctBadge(dd.max.pct)}</div>
         <div className="dd-sub">{dd.max.date ? ddDate(dd.max.date) : 'No drawdown yet'}</div>
+        {noPct}
       </section>
     </>
   )

@@ -1,11 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import type { Trade } from '../lib/types'
 import { accountOf, balanceBasis, useAccountBalances } from '../lib/accounts'
-import { equityCurve, groupStats, summarize } from '../lib/stats'
+import { groupStats, summarize } from '../lib/stats'
 import { dayKey, tradeTime } from '../lib/trades'
 import { fmtMoney, fmtMoneyShort, fmtPct, pnlClass } from '../lib/format'
 import {
-  currentDrawdownPct, currentStreak, drawdownStats, holdTimePnl, hourlyPnl, monthlyPnl,
+  currentStreak, drawdownStats, holdTimePnl, hourlyPnl, monthlyPnl,
   volumeBySymbol, weekdayPnl, weekStart, changePctBuckets, yearMonths,
   type Bar,
 } from '../lib/dashboard'
@@ -164,7 +164,6 @@ export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
   }, [allTrades, range])
 
   const s = useMemo(() => summarize(trades), [trades])
-  const allCurve = useMemo(() => equityCurve(allTrades), [allTrades])
 
   // Risk status always looks at "now", regardless of the date filter.
   const risk = useMemo(() => {
@@ -175,13 +174,11 @@ export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
       sum: summarize(allTrades.filter((t) => tradeTime(t) >= from)),
       tradesToday: allTrades.filter((t) => dayKey(tradeTime(t)) === todayKey).length,
       streak: currentStreak(allTrades),
-      // % of the account balance at the equity peak (same basis as the drawdown widgets). Without a balance, fall back to the P&L peak, capped at 100.
-      dd: (() => {
-        const pct = drawdownStats(allTrades, basis.startBalance, basis.transfers).current.pct
-        return pct != null ? Math.abs(pct) * 100 : Math.min(100, currentDrawdownPct(allCurve))
-      })(),
+      // % of the account balance at the equity peak (same basis as the drawdown widgets).
+      // Null when an account's size is unknown: then only the $ drop is shown.
+      dd: drawdownStats(allTrades, basis.startBalance, basis.transfers).current,
     }
-  }, [allTrades, riskRange, allCurve, basis])
+  }, [allTrades, riskRange, basis])
 
   const strategies = useMemo(
     () => groupStats(trades, (t) => t.tags ?? []).sort((a, b) => b.count - a.count).slice(0, 4),
@@ -270,7 +267,13 @@ export function Dashboard({ trades: everyTrade }: { trades: Trade[] }) {
               <dd className={risk.streak.kind === 'win' ? 'win' : risk.streak.kind === 'loss' ? 'loss' : ''}>{risk.streak.length} {streakWord}</dd>
               <dt>Trades today</dt><dd>{risk.tradesToday}</dd>
               <dt>Current drawdown</dt>
-              <dd>{risk.dd.toFixed(2)}% <span className={`badge ${risk.dd > 10 ? 'neg' : 'pos'}`}>{risk.dd > 10 ? 'CAUTION' : 'SAFE'}</span></dd>
+              {risk.dd.pct != null ? (
+                <dd>{(Math.abs(risk.dd.pct) * 100).toFixed(2)}% <span className={`badge ${Math.abs(risk.dd.pct) > 0.1 ? 'neg' : 'pos'}`}>{Math.abs(risk.dd.pct) > 0.1 ? 'CAUTION' : 'SAFE'}</span></dd>
+              ) : (
+                <dd title="Set a starting balance for every account in Settings → Accounts to see this as a % with a SAFE / CAUTION rating.">
+                  <span className={risk.dd.amount < 0 ? 'loss' : ''}>{fmtMoney(risk.dd.amount, false)}</span> <span className="muted fs-12">no balance set</span>
+                </dd>
+              )}
             </dl>
           </Widget>
 
